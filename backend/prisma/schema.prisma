@@ -1,0 +1,67 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id         Int      @id @default(autoincrement())
+  chat_id    String   @unique
+  user_name  String?
+  first_name String?
+  last_name  String?
+  is_blocked Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  messages   Message[]
+}
+
+model Message {
+  id        Int      @id @default(autoincrement())
+  content   String
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Post {
+  id            Int      @id @default(autoincrement())
+  image         String   // URL to the stored image
+  description   String
+  link_to_button String? // Link to button value for categorization
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model ButtonSettings {
+  id          Int      @id @default(autoincrement())
+  name        String   // Button name
+  type        String   // 'url' or 'callback'
+  value       String   // URL or callback_data
+  order       Int      // Button order in the keyboard
+  render_type String?  // Optional render type
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model StartMessageSettings {
+  id          Int      @id @default(autoincrement())
+  text        String   // Welcome message text
+  image       String?  // Optional welcome image
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Admin {
+  id         Int      @id @default(autoincrement())
+  user_name  String   @unique
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}

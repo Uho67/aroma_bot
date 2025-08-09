@@ -1,0 +1,70 @@
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+backend/prisma/dev.db
+backend/prisma/*.db
+
+# Environment variables
+.env
+.env.local
+.env.production
+.env.development
+
+# Logs
+logs
+*.log
+pm2.log
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Build outputs
+frontend/dist/
+frontend/build/
+backend/dist/
+backend/build/
+
+# Uploads (optional - you might want to keep these)
+backend/src/uploads/*
+!backend/src/uploads/.gitkeep
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+
+# Cache
+.cache/
+.npm/
+.yarn/
+
+# Coverage directory used by tools like istanbul
+coverage/
+*.lcov
+
+# nyc test coverage
+.nyc_output
