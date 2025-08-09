@@ -56,6 +56,7 @@
       <div v-else-if="posts.length === 0" class="no-posts">No posts yet</div>
       <div v-else class="posts-grid">
         <div v-for="post in posts" :key="post.id" class="post-card">
+          <div class="post-id-badge">ID: {{ post.id }}</div>
           <img :src="post.image" :alt="post.description">
           <p class="description">{{ post.description }}</p>
           <p v-if="post.link_to_button" class="category">
@@ -259,6 +260,20 @@ button:disabled {
   border-radius: 8px;
   overflow: hidden;
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  position: relative;
+}
+
+.post-id-badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: #007bff;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.8em;
+  font-weight: bold;
+  z-index: 1;
 }
 
 .post-card img {

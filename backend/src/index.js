@@ -54,12 +54,81 @@ async function initializeBotOnStartup() {
 }
 
 // API Routes
+// Get all users with pagination
 app.get('/api/users', async (req, res) => {
   try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 50;
+    const search = req.query.search || '';
+    const status = req.query.status || '';
+    const dateFrom = req.query.dateFrom;
+    const dateTo = req.query.dateTo;
+
+    const skip = (page - 1) * limit;
+
+    // Build where clause for filtering
+    const where = {};
+
+    // Search filter
+    if (search.trim()) {
+      where.OR = [
+        { first_name: { contains: search, mode: 'insensitive' } },
+        { last_name: { contains: search, mode: 'insensitive' } },
+        { user_name: { contains: search, mode: 'insensitive' } },
+        { chat_id: { contains: search } }
+      ];
+    }
+
+    // Status filter
+    if (status === 'active') {
+      where.is_blocked = false;
+    } else if (status === 'blocked') {
+      where.is_blocked = true;
+    }
+
+    // Date range filter
+    if (dateFrom || dateTo) {
+      where.createdAt = {};
+
+      if (dateFrom) {
+        // Start of day in UTC (matches database storage format)
+        where.createdAt.gte = new Date(dateFrom + 'T00:00:00.000Z');
+      }
+
+      if (dateTo) {
+        // End of day in UTC (matches database storage format)
+        where.createdAt.lte = new Date(dateTo + 'T23:59:59.999Z');
+      }
+    }
+
+    // Get total count for pagination
+    const totalUsers = await prisma.user.count({ where });
+
+    // Get paginated users
     const users = await prisma.user.findMany({
-      include: { messages: true }
+      where,
+      include: {
+        messages: {
+          orderBy: { createdAt: 'desc' },
+          take: 5 // Last 5 messages per user
+        }
+      },
+      orderBy: { createdAt: 'desc' },
+      skip,
+      take: limit
     });
-    res.json(users);
+
+    res.json({
+      users,
+      pagination: {
+        page,
+        limit,
+        total: totalUsers,
+        totalPages: Math.ceil(totalUsers / limit),
+        hasNext: page * limit < totalUsers,
+        hasPrev: page > 1
+      }
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
