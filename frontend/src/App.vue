@@ -49,6 +49,20 @@
                 <i class="fas fa-user-shield me-2"></i>Админы
               </a>
             </li>
+            <li class="nav-item mx-1">
+              <a class="nav-link px-3 py-2 rounded-pill fw-medium" 
+                 :class="{ 'active bg-primary text-white': currentView === 'sales-rules' }"
+                 href="#" @click.prevent="setView('sales-rules')">
+                <i class="fas fa-tags me-2"></i>Правила продаж
+              </a>
+            </li>
+            <li class="nav-item mx-1">
+              <a class="nav-link px-3 py-2 rounded-pill fw-medium" 
+                 :class="{ 'active bg-primary text-white': currentView === 'coupons' }"
+                 href="#" @click.prevent="setView('coupons')">
+                <i class="fas fa-ticket-alt me-2"></i>Купоны
+              </a>
+            </li>
           </ul>
         </div>
       </div>
@@ -65,6 +79,8 @@
               <StartMessageManager v-if="currentView === 'start-message'" />
               <UserManager v-if="currentView === 'user_list'" />
               <AdminManager v-if="currentView === 'admins'" />
+              <SalesRuleManager v-if="currentView === 'sales-rules'" />
+              <CouponCodeManager v-if="currentView === 'coupons'" />
             </div>
           </div>
         </div>
@@ -79,6 +95,8 @@ import ButtonManager from './components/ButtonManager.vue';
 import StartMessageManager from './components/StartMessageManager.vue';
 import UserManager from './components/UserManager.vue';
 import AdminManager from './components/AdminManager.vue';
+import SalesRuleManager from './components/SalesRuleManager.vue';
+import CouponCodeManager from './components/CouponCodeManager.vue';
 
 export default {
   name: 'App',
@@ -87,7 +105,9 @@ export default {
     ButtonManager,
     StartMessageManager,
     UserManager,
-    AdminManager
+    AdminManager,
+    SalesRuleManager,
+    CouponCodeManager
   },
   data() {
     return {

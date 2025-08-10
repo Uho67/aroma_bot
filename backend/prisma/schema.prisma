@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -11,14 +8,14 @@ datasource db {
 }
 
 model User {
-  id         Int      @id @default(autoincrement())
-  chat_id    String   @unique
+  id         Int          @id @default(autoincrement())
+  chat_id    String       @unique
   user_name  String?
   first_name String?
   last_name  String?
-  is_blocked Boolean  @default(false)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  is_blocked Boolean      @default(false)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
   messages   Message[]
 }
 
@@ -26,42 +23,68 @@ model Message {
   id        Int      @id @default(autoincrement())
   content   String
   userId    Int
-  user      User     @relation(fields: [userId], references: [id])
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id])
 }
 
 model Post {
-  id            Int      @id @default(autoincrement())
-  image         String   // URL to the stored image
-  description   String
-  link_to_button String? // Link to button value for categorization
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id             Int      @id @default(autoincrement())
+  image          String
+  description    String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  link_to_button String?
 }
 
 model ButtonSettings {
   id          Int      @id @default(autoincrement())
-  name        String   // Button name
-  type        String   // 'url' or 'callback'
-  value       String   // URL or callback_data
-  order       Int      // Button order in the keyboard
-  render_type String?  // Optional render type
+  name        String
+  type        String
+  value       String
+  order       Int
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  render_type String?
 }
 
 model StartMessageSettings {
-  id          Int      @id @default(autoincrement())
-  text        String   // Welcome message text
-  image       String?  // Optional welcome image
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id        Int      @id @default(autoincrement())
+  text      String
+  image     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Admin {
-  id         Int      @id @default(autoincrement())
-  user_name  String   @unique
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id        Int      @id @default(autoincrement())
+  user_name String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model SalesRule {
+  id          Int          @id @default(autoincrement())
+  name        String
+  description String?
+  image       String?
+  max_uses    Int          @default(1)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  admin_link  String?
+  coupons     CouponCode[]
+}
+
+model CouponCode {
+  id            Int       @id @default(autoincrement())
+  code          String    @unique
+  chat_id       String
+  uses_count    Int       @default(0)
+  max_uses      Int       @default(1)
+  used_at       DateTime?
+  is_sent       Boolean   @default(false)
+  sales_rule_id Int
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  sales_rule    SalesRule @relation(fields: [sales_rule_id], references: [id])
 }

@@ -99,7 +99,8 @@ export default {
   methods: {
     async fetchButtons() {
       try {
-        const response = await axios.get('/api/buttons');
+        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3008';
+        const response = await axios.get(`${API_URL}/api/buttons`);
         this.buttons = response.data;
       } catch (error) {
         console.error('Error fetching buttons:', error);
@@ -107,7 +108,8 @@ export default {
     },
     async createButton() {
       try {
-        const response = await axios.post('/api/buttons', this.newButton);
+        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3008';
+        const response = await axios.post(`${API_URL}/api/buttons`, this.newButton);
         this.buttons.push(response.data);
         this.newButton = { name: '', type: 'url', value: '', render_type: '', order: '' };
       } catch (error) {
@@ -116,7 +118,8 @@ export default {
     },
     async deleteButton(id) {
       try {
-        await axios.delete(`/api/buttons/${id}`);
+        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3008';
+        await axios.delete(`${API_URL}/api/buttons/${id}`);
         this.buttons = this.buttons.filter(button => button.id !== id);
       } catch (error) {
         console.error('Error deleting button:', error);

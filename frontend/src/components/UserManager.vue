@@ -4,6 +4,7 @@
         <h2>Управление пользователями</h2>
         <div class="d-flex gap-2 align-items-center">
           <div v-if="selectedUsers.length > 0" class="d-flex gap-2 align-items-center">
+            <!-- Send Post Form -->
             <input 
               v-model="postIdToSend" 
               type="number" 
@@ -15,6 +16,20 @@
               <span v-if="sendingPost" class="spinner-border spinner-border-sm me-1"></span>
               <i v-else class="fas fa-paper-plane"></i>
               {{ sendingPost ? 'Отправка...' : `Отправить (${selectedUsers.length})` }}
+            </button>
+            
+            <!-- Sales Rule Form -->
+            <div class="vr mx-2"></div>
+            <select v-model="selectedSalesRuleId" class="form-select" style="width: 200px;">
+              <option value="">Выберите правило продаж</option>
+              <option v-for="rule in salesRules" :key="rule.id" :value="rule.id">
+                {{ rule.name }}
+              </option>
+            </select>
+            <button @click="offerPromotion" class="btn btn-warning" :disabled="!selectedSalesRuleId || offeringPromotion">
+              <span v-if="offeringPromotion" class="spinner-border spinner-border-sm me-1"></span>
+              <i v-else class="fas fa-tags"></i>
+              {{ offeringPromotion ? 'Создание...' : 'Предложить акцию' }}
             </button>
           </div>
           <button @click="loadUsers" class="btn btn-outline-primary" :disabled="loading">
@@ -324,7 +339,7 @@
 <script>
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3004';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3008';
 
 export default {
   name: 'UserManager',
@@ -350,11 +365,17 @@ export default {
       selectedUsers: [],
       postIdToSend: '',
       sendingPost: false,
-      sendError: null
+      sendError: null,
+      salesRules: [],
+      selectedSalesRuleId: '',
+      offeringPromotion: false
     };
   },
   async created() {
-    await this.loadUsers();
+    await Promise.all([
+      this.loadUsers(),
+      this.loadSalesRules()
+    ]);
   },
   computed: {
     totalPages() {
@@ -439,7 +460,7 @@ export default {
           params.dateTo = this.dateTo;
         }
         
-        const response = await axios.get('/api/users', { params });
+        const response = await axios.get(`${API_URL}/api/users`, { params });
         this.users = response.data.users;
         this.pagination = response.data.pagination;
       } catch (error) {
@@ -451,7 +472,7 @@ export default {
     },
     async blockUser(chatId) {
       try {
-        await axios.put(`/api/users/${chatId}/block`, { is_blocked: true });
+        await axios.put(`${API_URL}/api/users/${chatId}/block`, { is_blocked: true });
         await this.loadUsers(); // Reload users
       } catch (error) {
         this.error = 'Ошибка при блокировке пользователя';
@@ -460,7 +481,7 @@ export default {
     },
     async unblockUser(chatId) {
       try {
-        await axios.put(`/api/users/${chatId}/block`, { is_blocked: false });
+        await axios.put(`${API_URL}/api/users/${chatId}/block`, { is_blocked: false });
         await this.loadUsers(); // Reload users
       } catch (error) {
         this.error = 'Ошибка при разблокировке пользователя';
@@ -497,7 +518,7 @@ export default {
         this.sendError = null;
         
         try {
-          const response = await axios.post('/api/broadcast/custom', {
+          const response = await axios.post(`${API_URL}/api/broadcast/custom`, {
             postId: parseInt(this.postIdToSend),
             userIds: this.selectedUsers
           });
@@ -518,6 +539,41 @@ export default {
           }
         } finally {
           this.sendingPost = false;
+        }
+      },
+      
+      async loadSalesRules() {
+        try {
+          const response = await axios.get(`${API_URL}/api/sales-rules`);
+          this.salesRules = response.data;
+        } catch (error) {
+          console.error('Error loading sales rules:', error);
+        }
+      },
+      
+      async offerPromotion() {
+        if (!this.selectedSalesRuleId || this.selectedUsers.length === 0) return;
+        
+        this.offeringPromotion = true;
+        
+        try {
+          const response = await axios.post(`${API_URL}/api/sales-rules/${this.selectedSalesRuleId}/send`, {
+            userIds: this.selectedUsers
+          });
+          
+          if (response.data.success) {
+            alert(`Акция успешно предложена ${this.selectedUsers.length} пользователям! Создано ${response.data.couponCodesCount} купонов.`);
+            // Clear selection
+            this.selectedUsers = [];
+            this.selectedSalesRuleId = '';
+          } else {
+            alert('Ошибка при создании купонов');
+          }
+        } catch (error) {
+          console.error('Error offering promotion:', error);
+          alert('Ошибка при предложении акции: ' + (error.response?.data?.error || error.message));
+        } finally {
+          this.offeringPromotion = false;
         }
       },
       formatDate(dateString) {

@@ -79,6 +79,8 @@
 <script>
 import axios from 'axios';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3008';
+
 export default {
   name: 'AdminManager',
   data() {
@@ -98,7 +100,7 @@ export default {
     async loadAdmins() {
       this.loading = true;
       try {
-        const response = await axios.get('/api/admins');
+        const response = await axios.get(`${API_URL}/api/admins`);
         this.admins = response.data;
       } catch (error) {
         console.error('Error loading admins:', error);
