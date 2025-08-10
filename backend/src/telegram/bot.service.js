@@ -203,7 +203,7 @@ class BotService {
       // Create admin button with pre-filled message
       const adminButton = {
         text: 'Получить скидку',
-        url: `${salesRule.admin_link}?text=${encodeURIComponent(`Доброго дня, бажаю зробити замовлення з SalesCode=${code}`)}`
+        url: `${salesRule.admin_link}?text=${encodeURIComponent(`Доброго дня, бажаю зробити замовлення з SalesCode:\n${code}`)}`
       };
 
       const keyboard = {
