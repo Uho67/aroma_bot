@@ -34,9 +34,21 @@ frontend/build/
 backend/dist/
 backend/build/
 
-# Uploads (optional - you might want to keep these)
+# Uploads and images
 backend/src/uploads/*
 !backend/src/uploads/.gitkeep
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# Image files
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.webp
+*.bmp
+*.tiff
+*.svg
 
 # IDE files
 .vscode/
