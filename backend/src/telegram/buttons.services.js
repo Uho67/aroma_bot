@@ -8,20 +8,20 @@ class ButtonsService {
 
   async getWelcomeMenuButtons() {
     return await this.getButtonByRendererType([
-        { render_type: null },
-        { render_type: ButtonInterface.admin_render_type },
-        { render_type: ButtonInterface.welcome_render_type }
-      ]);
+      { render_type: null },
+      { render_type: ButtonInterface.admin_render_type },
+      { render_type: ButtonInterface.welcome_render_type }
+    ]);
   }
 
   async getCatalogMenuButtons() {
     const buttons = await this.getButtonByRendererType([
-        { render_type: ButtonInterface.catalog_render_type },
-        { render_type: ButtonInterface.admin_render_type }
-      ]);
-      buttons.inline_keyboard.push(this.getBackWelcomeButton());
+      { render_type: ButtonInterface.catalog_render_type },
+      { render_type: ButtonInterface.admin_render_type }
+    ]);
+    buttons.inline_keyboard.push(this.getBackWelcomeButton());
 
-      return buttons;
+    return buttons;
   }
 
   async getButtonsForOrder() {
@@ -37,40 +37,40 @@ class ButtonsService {
 
   async getButtonByRendererType(renderTypes = []) {
     const buttons = await this.prisma.buttonSettings.findMany({
-        where: {
-            OR: renderTypes
-          },
-          orderBy: {
-            order: 'asc'
-          }
+      where: {
+        OR: renderTypes
+      },
+      orderBy: {
+        order: 'asc'
+      }
     });
-  
+
     const keyboard = [];
     let currentRow = [];
-  
+
     buttons.forEach((button, index) => {
       const buttonConfig = {
         text: button.name,
-        [button.type === 'url' ? 'url' : 'callback_data']: button.render_type === 'order' ? button.value + '?text=' + encodeURIComponent('Добрий день! Хочу зробити замовлення:') : button.value
+        [button.type === 'url' ? 'url' : 'callback_data']: button.render_type === 'order' ? button.value + '?text=' + encodeURIComponent('Добрий день! Хочу зробити замовлення') : button.value
       };
-  
+
       // Add emoji based on button type
       if (button.type === 'url') {
         buttonConfig.text = '🔗 ' + buttonConfig.text;
       } else if (button.value === 'catalog') {
         buttonConfig.text = '📋 ' + buttonConfig.text;
       }
-      
+
       // Add button to current row
       currentRow.push(buttonConfig);
-      
+
       // If we have 2 buttons in the row or this is the last button, add the row to keyboard
       if (currentRow.length === 2 || index === buttons.length - 1) {
         keyboard.push(currentRow);
         currentRow = [];
       }
     });
-  
+
     return { inline_keyboard: keyboard };
   }
 

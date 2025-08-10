@@ -12,6 +12,9 @@ const PostRouter = require('./post/post.router');
 const UploadRouter = require('./upload/upload.router');
 const BroadcastRouter = require('./broadcast/broadcast.router');
 const BotService = require('./telegram/bot.service');
+const AdminBotService = require('./telegram/admin-bot.service');
+const SalesRuleRouter = require('./sales-rule/sales-rule.router');
+const CouponCodeRouter = require('./coupon-code/coupon-code.router');
 
 const prisma = new PrismaClient();
 const app = express();
@@ -25,7 +28,10 @@ const buttonRouter = new ButtonRouter();
 const postRouter = new PostRouter();
 const uploadRouter = new UploadRouter();
 const botService = new BotService();
+const adminBotService = new AdminBotService();
 const broadcastRouter = new BroadcastRouter(botService);
+const salesRuleRouter = new SalesRuleRouter();
+const couponCodeRouter = new CouponCodeRouter();
 
 
 
@@ -47,10 +53,16 @@ app.use('/api', buttonRouter.getRouter());
 app.use('/api', postRouter.getRouter());
 app.use('/api', uploadRouter.getRouter());
 app.use('/api', broadcastRouter.getRouter());
+app.use('/api', salesRuleRouter.getRouter());
+app.use('/api', couponCodeRouter.getRouter());
 
-// Initialize bot on startup
-async function initializeBotOnStartup() {
+// Initialize bots on startup
+async function initializeBotsOnStartup() {
   await botService.initializeBot();
+  await adminBotService.initializeBot();
+  // Set the global instances
+  BotService.instance = botService;
+  AdminBotService.instance = adminBotService;
 }
 
 // API Routes
@@ -192,8 +204,8 @@ app.put('/api/start-message', async (req, res) => {
 
 
 
-// Start server and initialize bot
+// Start server and initialize bots
 app.listen(port, async () => {
   console.log(`Server is running on port ${port}`);
-  await initializeBotOnStartup();
+  await initializeBotsOnStartup();
 });

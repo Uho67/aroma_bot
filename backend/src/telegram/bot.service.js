@@ -14,6 +14,13 @@ class BotService {
     this.userService = new UserService();
   }
 
+  static getInstance() {
+    if (!BotService.instance) {
+      BotService.instance = new BotService();
+    }
+    return BotService.instance;
+  }
+
   async initializeBot() {
     const token = process.env.TELEGRAM_BOT_TOKEN;
     if (!token) {
@@ -35,7 +42,7 @@ class BotService {
     // Start command
     this.bot.onText(/\/start/, async (msg) => {
       const chatId = msg.chat.id;
-      
+
       try {
         const userData = {
           chat_id: chatId.toString(),
@@ -47,7 +54,7 @@ class BotService {
 
         // Check if user already exists
         const existingUser = await this.userService.getUserByChatId(chatId.toString());
-        
+
         if (!existingUser) {
           // Create new user if they don't exist
           await this.userService.createUser(userData);
@@ -103,16 +110,16 @@ class BotService {
               caption: post.description,
               reply_markup: await this.buttonsService.getButtonsForOrder()
             });
-          } 
+          }
         } else {
-          await this.bot.sendMessage(chatId, 'Категория не найдена' , {
+          await this.bot.sendMessage(chatId, 'Категория не найдена', {
             reply_markup: await this.buttonsService.getCatalogMenuButtons()
           });
         }
       } else if (data.startsWith('message_')) {
         // Handle message buttons - extract message text from button value
         const messageText = data.replace('message_', '');
-        
+
         if (messageText) {
           await this.bot.sendMessage(chatId, messageText);
         } else {
@@ -130,13 +137,13 @@ class BotService {
       try {
         // Check if user exists in database
         const existingUser = await this.userService.getUserByChatId(chatId.toString());
-        
+
         if (existingUser) {
           // Update user's blocked status based on new status
           const isBlocked = newStatus === 'kicked' || newStatus === 'left';
-          
+
           await this.userService.updateUserBlockStatus(chatId.toString(), isBlocked);
-          
+
           if (isBlocked) {
             console.log(`User ${existingUser.first_name} (${chatId}) blocked the bot`);
           } else {
@@ -175,6 +182,58 @@ class BotService {
         caption: startMessage.text,
         reply_markup: keyboard
       });
+    }
+  }
+
+  /**
+   * Send coupon notification to user
+   * @param {Object} couponCode - The coupon code object with sales_rule relation
+   */
+  async sendCouponNotification(couponCode) {
+    try {
+      if (!this.bot) {
+        console.error('Bot not initialized');
+        return;
+      }
+
+      const chatId = couponCode.chat_id;
+      const salesRule = couponCode.sales_rule;
+      const code = couponCode.code;
+
+      // Create admin button with pre-filled message
+      const adminButton = {
+        text: 'Получить скидку',
+        url: `${salesRule.admin_link}?text=${encodeURIComponent(`Доброго дня, бажаю зробити замовлення з SalesCode:\n${code}`)}`
+      };
+
+      const keyboard = {
+        inline_keyboard: [[adminButton]]
+      };
+
+      // Send photo with caption and button
+      if (salesRule.image) {
+        const imagePath = path.join(__dirname, '..', salesRule.image);
+        if (fs.existsSync(imagePath)) {
+          await this.bot.sendPhoto(chatId, imagePath, {
+            caption: salesRule.description || 'У вас есть новый купон на скидку!',
+            reply_markup: keyboard
+          });
+        } else {
+          // If image doesn't exist, send text message with button
+          await this.bot.sendMessage(chatId, salesRule.description || 'У вас есть новый купон на скидку!', {
+            reply_markup: keyboard
+          });
+        }
+      } else {
+        // If no image, send text message with button
+        await this.bot.sendMessage(chatId, salesRule.description || 'У вас есть новый купон на скидку!', {
+          reply_markup: keyboard
+        });
+      }
+
+      console.log(`Coupon notification sent to user ${chatId} for code ${code}`);
+    } catch (error) {
+      console.error('Error sending coupon notification:', error);
     }
   }
 

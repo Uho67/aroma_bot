@@ -75,7 +75,7 @@
 <script>
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3002';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3008';
 
 export default {
   name: 'PostManager',
@@ -93,7 +93,7 @@ export default {
   methods: {
     async fetchPosts() {
       try {
-        const response = await axios.get('/api/posts')
+        const response = await axios.get(`${API_URL}/api/posts`)
         // Update image URLs to use the full backend URL
         this.posts = response.data.map(post => ({
           ...post,
@@ -124,7 +124,7 @@ export default {
       }
 
       try {
-        const response = await axios.post('/api/posts', formData, {
+        const response = await axios.post(`${API_URL}/api/posts`, formData, {
           headers: {
             'Content-Type': 'multipart/form-data'
           }
@@ -148,7 +148,7 @@ export default {
       if (!confirm('Этот пост будет отправлен ВСЕМ подписчикам бота. Продолжить?')) return
 
       try {
-        const response = await axios.post(`/api/broadcast/${id}`)
+        const response = await axios.post(`${API_URL}/api/broadcast/${id}`)
         const result = response.data
         alert(`Пост успешно отправлен! Отправлено: ${result.sentCount} из ${result.totalUsers} пользователей`)
       } catch (error) {
@@ -161,7 +161,7 @@ export default {
       if (!confirm('Are you sure you want to delete this post?')) return
 
       try {
-        await axios.delete(`/api/posts/${id}`)
+        await axios.delete(`${API_URL}/api/posts/${id}`)
         this.posts = this.posts.filter(post => post.id !== id)
       } catch (error) {
         console.error('Error deleting post:', error)
