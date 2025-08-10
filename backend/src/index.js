@@ -84,9 +84,9 @@ app.get('/api/users', async (req, res) => {
     // Search filter
     if (search.trim()) {
       where.OR = [
-        { first_name: { contains: search, mode: 'insensitive' } },
-        { last_name: { contains: search, mode: 'insensitive' } },
-        { user_name: { contains: search, mode: 'insensitive' } },
+        { first_name: { contains: search } },
+        { last_name: { contains: search } },
+        { user_name: { contains: search } },
         { chat_id: { contains: search } }
       ];
     }
