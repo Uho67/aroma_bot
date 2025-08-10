@@ -62,6 +62,12 @@ Thumbs.db
 .npm/
 .yarn/
 
+# Uploads and images
+backend/src/uploads/*
+!backend/src/uploads/.gitkeep
+backend/uploads/*
+!backend/uploads/.gitkeep
+
 # Coverage directory used by tools like istanbul
 coverage/
 *.lcov
