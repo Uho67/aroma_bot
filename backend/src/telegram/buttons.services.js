@@ -1,5 +1,6 @@
 const { PrismaClient } = require('@prisma/client'); // Import PrismaClient
 const ButtonInterface = require('./button.interface');
+const configHelper = require('../configuration/config-helper');
 
 class ButtonsService {
   constructor() {
@@ -48,10 +49,26 @@ class ButtonsService {
     const keyboard = [];
     let currentRow = [];
 
-    buttons.forEach((button, index) => {
+    // Get admin_path configuration once
+    const adminPath = await configHelper.get('admin_path', '');
+
+    for (let i = 0; i < buttons.length; i++) {
+      const button = buttons[i];
+      let buttonUrl = button.value;
+
+      // For admin and order buttons with value "config", use the admin_path configuration
+      if ((button.render_type === 'admin' || button.render_type === 'order') && button.value === 'config') {
+        buttonUrl = adminPath || button.value;
+      }
+
+      // Add the order message for ALL order buttons (regardless of value)
+      if (button.render_type === 'order') {
+        buttonUrl += '?text=' + encodeURIComponent('Добрий день! Хочу зробити замовлення');
+      }
+
       const buttonConfig = {
         text: button.name,
-        [button.type === 'url' ? 'url' : 'callback_data']: button.render_type === 'order' ? button.value + '?text=' + encodeURIComponent('Добрий день! Хочу зробити замовлення') : button.value
+        [button.type === 'url' ? 'url' : 'callback_data']: buttonUrl
       };
 
       // Add emoji based on button type
@@ -65,11 +82,11 @@ class ButtonsService {
       currentRow.push(buttonConfig);
 
       // If we have 2 buttons in the row or this is the last button, add the row to keyboard
-      if (currentRow.length === 2 || index === buttons.length - 1) {
+      if (currentRow.length === 2 || i === buttons.length - 1) {
         keyboard.push(currentRow);
         currentRow = [];
       }
-    });
+    }
 
     return { inline_keyboard: keyboard };
   }
