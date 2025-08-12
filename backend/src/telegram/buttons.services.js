@@ -61,7 +61,7 @@ class ButtonsService {
         buttonUrl = adminPath || button.value;
       }
 
-      // Add the order message for ALL order buttons (regardless of value)
+      // Add the order message ONLY for order buttons (NOT for admin buttons)
       if (button.render_type === 'order') {
         buttonUrl += '?text=' + encodeURIComponent('Добрий день! Хочу зробити замовлення');
       }
