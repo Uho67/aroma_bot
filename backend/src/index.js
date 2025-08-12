@@ -16,6 +16,7 @@ const AdminBotService = require('./telegram/admin-bot.service');
 const SalesRuleRouter = require('./sales-rule/sales-rule.router');
 const CouponCodeRouter = require('./coupon-code/coupon-code.router');
 const ConfigurationRouter = require('./configuration/configuration.router');
+const SubscriptionRouter = require('./telegram/subscription.router');
 
 const prisma = new PrismaClient();
 const app = express();
@@ -34,6 +35,7 @@ const broadcastRouter = new BroadcastRouter(botService);
 const salesRuleRouter = new SalesRuleRouter();
 const couponCodeRouter = new CouponCodeRouter();
 const configurationRouter = new ConfigurationRouter();
+const subscriptionRouter = new SubscriptionRouter();
 
 
 
@@ -58,11 +60,16 @@ app.use('/api', broadcastRouter.getRouter());
 app.use('/api', salesRuleRouter.getRouter());
 app.use('/api', couponCodeRouter.getRouter());
 app.use('/api', configurationRouter.getRouter());
+app.use('/api', subscriptionRouter.getRouter());
 
 // Initialize bots on startup
 async function initializeBotsOnStartup() {
   await botService.initializeBot();
   await adminBotService.initializeBot();
+
+  // Initialize subscription service with admin bot
+  await subscriptionRouter.subscriptionService.initialize(adminBotService.getBot());
+
   // Set the global instances
   BotService.instance = botService;
   AdminBotService.instance = adminBotService;

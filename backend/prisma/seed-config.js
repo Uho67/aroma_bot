@@ -17,6 +17,10 @@ async function seedConfigurations() {
 				value: 'https://t.me/your_channel'
 			},
 			{
+				path: 'channel_username',
+				value: 'your_channel'
+			},
+			{
 				path: 'admin_path',
 				value: 'https://t.me/your_admin_bot'
 			}
