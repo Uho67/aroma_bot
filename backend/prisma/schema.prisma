@@ -88,3 +88,11 @@ model CouponCode {
   updatedAt     DateTime  @updatedAt
   sales_rule    SalesRule @relation(fields: [sales_rule_id], references: [id])
 }
+
+model Configuration {
+  id        Int      @id @default(autoincrement())
+  path      String   @unique
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
