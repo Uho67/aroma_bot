@@ -86,24 +86,48 @@ class AdminBotService {
 			const subscriptionEmoji = subscriptionStatus ? '✅' : '❌';
 			const subscriptionText = subscriptionStatus ? 'Подписан на канал' : 'НЕ подписан на канал';
 
+			// Check if coupon is fully used
+			const isFullyUsed = couponCode.uses_count >= couponCode.max_uses;
+			const usageEmoji = isFullyUsed ? '❌' : '✅';
+			const usageText = isFullyUsed ? 'Использовано раз (МАКСИМУМ)' : 'Использовано раз';
+
 			// Create message with coupon info and subscription status
-			const message = `🔍 **Информация о купоне**\n\n` +
+			let message = `🔍 **Информация о купоне**\n\n` +
 				`📋 **Код:**\n\`${couponCode.code}\`\n` +
 				`📊 **Максимум использований:** ${couponCode.max_uses}\n` +
-				`✅ **Использовано раз:** ${couponCode.uses_count}\n` +
+				`${usageEmoji} **${usageText}:** ${couponCode.uses_count}\n` +
 				`📺 **Подписка:** ${subscriptionEmoji} ${subscriptionText}\n` +
 				`🎯 **Акция:** ${couponCode.sales_rule.name}\n` +
 				`📝 **Описание:** ${couponCode.sales_rule.description || 'Нет описания'}`;
 
-			// Create inline keyboard with "Use Coupon" button
-			const keyboard = {
-				inline_keyboard: [[
-					{
-						text: '🎫 Использовать купон',
-						callback_data: `use_coupon:${couponCode.id}`
-					}
-				]]
-			};
+			// Add warning if coupon is fully used
+			if (isFullyUsed) {
+				message += `\n\n⚠️ **ВНИМАНИЕ:** Купон уже полностью использован!`;
+			}
+
+			// Create inline keyboard based on coupon usage status
+			let keyboard;
+			if (isFullyUsed) {
+				// Coupon is fully used - show disabled button
+				keyboard = {
+					inline_keyboard: [[
+						{
+							text: '❌ Купон полностью использован',
+							callback_data: 'coupon_fully_used'
+						}
+					]]
+				};
+			} else {
+				// Coupon can still be used
+				keyboard = {
+					inline_keyboard: [[
+						{
+							text: '🎫 Использовать купон',
+							callback_data: `use_coupon:${couponCode.id}`
+						}
+					]]
+				};
+			}
 
 			await this.bot.sendMessage(chatId, message, {
 				parse_mode: 'Markdown',
@@ -123,6 +147,13 @@ class AdminBotService {
 		if (data.startsWith('use_coupon:')) {
 			const couponId = parseInt(data.split(':')[1]);
 			await this.useCoupon(chatId, couponId, callbackQuery.message);
+		} else if (data === 'coupon_fully_used') {
+			// Handle fully used coupon button click
+			await this.bot.answerCallbackQuery(callbackQuery.id, {
+				text: '❌ Купон уже полностью использован!',
+				show_alert: true
+			});
+			return;
 		}
 
 		// Answer callback query to remove loading state
