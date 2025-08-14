@@ -118,7 +118,8 @@ class UserService {
           chat_id: chatId
         },
         data: {
-          is_blocked: isBlocked
+          is_blocked: isBlocked,
+          updatedAt: new Date() // Explicitly update timestamp
         }
       });
       return user;

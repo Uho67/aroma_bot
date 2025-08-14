@@ -8,25 +8,22 @@ datasource db {
 }
 
 model User {
-  id         Int          @id @default(autoincrement())
-  chat_id    String       @unique
-  user_name  String?
-  first_name String?
-  last_name  String?
-  is_blocked Boolean      @default(false)
-  createdAt  DateTime     @default(now())
-  updatedAt  DateTime     @updatedAt
-  messages   Message[]
+  id            Int          @id @default(autoincrement())
+  chat_id       String       @unique
+  user_name     String?
+  first_name    String?
+  last_name    String?
+  is_blocked    Boolean      @default(false)
+  is_in_chat    Boolean      @default(false)
+  is_subscriber Boolean      @default(false)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  
+  // Relations
+  userSalesRules UserSalesRule[]
 }
 
-model Message {
-  id        Int      @id @default(autoincrement())
-  content   String
-  userId    Int
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  user      User     @relation(fields: [userId], references: [id])
-}
+
 
 model Post {
   id             Int      @id @default(autoincrement())
@@ -71,8 +68,10 @@ model SalesRule {
   max_uses    Int          @default(1)
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
-  admin_link  String?
+  
+  // Relations
   coupons     CouponCode[]
+  userSalesRules UserSalesRule[]
 }
 
 model CouponCode {
@@ -87,6 +86,20 @@ model CouponCode {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   sales_rule    SalesRule @relation(fields: [sales_rule_id], references: [id])
+}
+
+model UserSalesRule {
+  id            Int       @id @default(autoincrement())
+  user_id       Int
+  sales_rule_id Int
+  createdAt     DateTime  @default(now())
+  
+  // Relations
+  user       User       @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  salesRule  SalesRule  @relation(fields: [sales_rule_id], references: [id], onDelete: Cascade)
+  
+  // Unique constraint to prevent duplicate assignments
+  @@unique([user_id, sales_rule_id])
 }
 
 model Configuration {

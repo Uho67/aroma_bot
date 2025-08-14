@@ -16,6 +16,7 @@ const AdminBotService = require('./telegram/admin-bot.service');
 const SalesRuleRouter = require('./sales-rule/sales-rule.router');
 const CouponCodeRouter = require('./coupon-code/coupon-code.router');
 const ConfigurationRouter = require('./configuration/configuration.router');
+const SubscriptionRouter = require('./telegram/subscription.router');
 
 const prisma = new PrismaClient();
 const app = express();
@@ -34,6 +35,7 @@ const broadcastRouter = new BroadcastRouter(botService);
 const salesRuleRouter = new SalesRuleRouter();
 const couponCodeRouter = new CouponCodeRouter();
 const configurationRouter = new ConfigurationRouter();
+const subscriptionRouter = new SubscriptionRouter();
 
 
 
@@ -58,11 +60,16 @@ app.use('/api', broadcastRouter.getRouter());
 app.use('/api', salesRuleRouter.getRouter());
 app.use('/api', couponCodeRouter.getRouter());
 app.use('/api', configurationRouter.getRouter());
+app.use('/api', subscriptionRouter.getRouter());
 
 // Initialize bots on startup
 async function initializeBotsOnStartup() {
   await botService.initializeBot();
   await adminBotService.initializeBot();
+
+  // Initialize subscription service with admin bot
+  await subscriptionRouter.subscriptionService.initialize(adminBotService.getBot());
+
   // Set the global instances
   BotService.instance = botService;
   AdminBotService.instance = adminBotService;
@@ -101,6 +108,14 @@ app.get('/api/users', async (req, res) => {
       where.is_blocked = true;
     }
 
+    // Subscription filter
+    const subscription = req.query.subscription || '';
+    if (subscription === 'subscribed') {
+      where.is_subscriber = true;
+    } else if (subscription === 'not_subscribed') {
+      where.is_subscriber = false;
+    }
+
     // Date range filter
     if (dateFrom || dateTo) {
       where.createdAt = {};
@@ -112,20 +127,43 @@ app.get('/api/users', async (req, res) => {
 
       if (dateTo) {
         // End of day in UTC (matches database storage format)
-        where.createdAt.lte = new Date(dateTo + 'T23:59:59.999Z');
+        where.createdAt.lte = new Date(dateTo + 'T23:59:59.000Z');
+      }
+    }
+
+    // Updated date range filter
+    const updatedFrom = req.query.updatedFrom;
+    const updatedTo = req.query.updatedTo;
+    if (updatedFrom || updatedTo) {
+      where.updatedAt = {};
+
+      if (updatedFrom) {
+        // Start of day in UTC (matches database storage format)
+        where.updatedAt.gte = new Date(updatedFrom + 'T00:00:00.000Z');
+      }
+
+      if (updatedTo) {
+        // End of day in UTC (matches database storage format)
+        where.updatedAt.lte = new Date(updatedTo + 'T23:59:59.000Z');
       }
     }
 
     // Get total count for pagination
     const totalUsers = await prisma.user.count({ where });
 
-    // Get paginated users
+    // Get paginated users with sales rules
     const users = await prisma.user.findMany({
       where,
       include: {
-        messages: {
-          orderBy: { createdAt: 'desc' },
-          take: 5 // Last 5 messages per user
+        userSalesRules: {
+          include: {
+            salesRule: {
+              select: {
+                id: true,
+                name: true
+              }
+            }
+          }
         }
       },
       orderBy: { createdAt: 'desc' },
@@ -146,6 +184,201 @@ app.get('/api/users', async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+// Check subscriptions for multiple users
+app.post('/api/users/check-subscriptions', async (req, res) => {
+  try {
+    const { userIds } = req.body;
+
+    if (!userIds || !Array.isArray(userIds)) {
+      return res.status(400).json({ error: 'userIds array is required' });
+    }
+
+    // Get users with their details
+    const users = await prisma.user.findMany({
+      where: {
+        chat_id: { in: userIds }
+      },
+      select: {
+        chat_id: true,
+        first_name: true,
+        last_name: true,
+        user_name: true
+      }
+    });
+
+    // Check subscriptions using the subscription service
+    const subscriptionResults = await subscriptionRouter.subscriptionService.checkMultipleSubscriptions(
+      users.map(user => user.chat_id)
+    );
+
+    // Organize results
+    const subscribed = [];
+    const notSubscribed = [];
+    let channelInfo = null;
+
+    for (let i = 0; i < subscriptionResults.length; i++) {
+      const result = subscriptionResults[i];
+      const user = users.find(u => u.chat_id === result.chatId);
+
+      if (result.isSubscribed) {
+        subscribed.push({
+          chatId: result.chatId,
+          firstName: user?.first_name || '',
+          lastName: user?.last_name || '',
+          userName: user?.user_name || '',
+          status: result.status
+        });
+      } else {
+        notSubscribed.push({
+          chatId: result.chatId,
+          firstName: user?.first_name || '',
+          lastName: user?.last_name || '',
+          userName: user?.user_name || '',
+          error: result.error
+        });
+      }
+
+      // Get channel info from first successful result
+      if (!channelInfo && result.channelTitle) {
+        channelInfo = {
+          title: result.channelTitle,
+          username: result.channelUsername
+        };
+      }
+    }
+
+    res.json({
+      subscribed,
+      notSubscribed,
+      channelInfo,
+      total: userIds.length
+    });
+
+  } catch (error) {
+    console.error('Error checking subscriptions:', error);
+    res.status(500).json({ error: 'Failed to check subscriptions' });
+  }
+});
+
+// Update user's sales rules
+app.put('/api/users/:chatId/sales-rules', async (req, res) => {
+  try {
+    const { chatId } = req.params;
+    const { sales_rules } = req.body;
+
+    if (sales_rules === undefined) {
+      return res.status(400).json({ error: 'sales_rules field is required' });
+    }
+
+    // Get user first
+    const user = await prisma.user.findUnique({
+      where: { chat_id: chatId }
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Delete existing relations
+    await prisma.userSalesRule.deleteMany({
+      where: { user_id: user.id }
+    });
+
+    // Create new relations if sales_rules provided
+    if (sales_rules && sales_rules.trim()) {
+      const ruleIds = sales_rules.split(',').filter(id => id.trim());
+
+      for (const ruleId of ruleIds) {
+        try {
+          await prisma.userSalesRule.create({
+            data: {
+              user_id: user.id,
+              sales_rule_id: parseInt(ruleId.trim())
+            }
+          });
+        } catch (error) {
+          console.warn(`Failed to create relation for rule ${ruleId}:`, error);
+        }
+      }
+    }
+
+    // Update user's updatedAt
+    const updatedUser = await prisma.user.update({
+      where: { id: user.id },
+      data: { updatedAt: new Date() }
+    });
+
+    res.json({ success: true, user: updatedUser });
+  } catch (error) {
+    console.error('Error updating user sales rules:', error);
+    res.status(500).json({ error: 'Failed to update user sales rules' });
+  }
+});
+
+// Check subscription for a single user
+app.post('/api/users/:chatId/check-subscription', async (req, res) => {
+  try {
+    const { chatId } = req.params;
+
+    // Get user details
+    const user = await prisma.user.findUnique({
+      where: { chat_id: chatId },
+      select: {
+        chat_id: true,
+        first_name: true,
+        last_name: true,
+        user_name: true
+      }
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Check subscription using the subscription service
+    const result = await subscriptionRouter.subscriptionService.checkSubscription(chatId);
+
+    // Organize result
+    if (result.isSubscribed) {
+      res.json({
+        subscribed: [{
+          chatId: result.chatId || chatId,
+          firstName: user.first_name || '',
+          lastName: user.last_name || '',
+          userName: user.user_name || '',
+          status: result.status
+        }],
+        notSubscribed: [],
+        channelInfo: result.channelTitle ? {
+          title: result.channelTitle,
+          username: result.channelUsername
+        } : null,
+        total: 1
+      });
+    } else {
+      res.json({
+        subscribed: [],
+        notSubscribed: [{
+          chatId: result.chatId || chatId,
+          firstName: user.first_name || '',
+          lastName: user.last_name || '',
+          userName: user.user_name || '',
+          error: result.error
+        }],
+        channelInfo: result.channelTitle ? {
+          title: result.channelTitle,
+          username: result.channelUsername
+        } : null,
+        total: 1
+      });
+    }
+
+  } catch (error) {
+    console.error('Error checking single subscription:', error);
+    res.status(500).json({ error: 'Failed to check subscription' });
   }
 });
 

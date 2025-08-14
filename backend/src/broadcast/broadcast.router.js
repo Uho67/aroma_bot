@@ -55,6 +55,18 @@ class BroadcastRouter {
                 reply_markup: keyboard
               });
             }
+
+            // Update user's updatedAt timestamp after successful send
+            try {
+              await this.broadcastService.prisma.user.update({
+                where: { chat_id: chatId },
+                data: { updatedAt: new Date() }
+              });
+            } catch (updateError) {
+              console.error(`Failed to update user timestamp for ${chatId}:`, updateError);
+              // Don't fail the post sending if timestamp update fails
+            }
+
             sentCount++;
           } catch (error) {
             console.error(`Error sending to user ${chatId}:`, error);
@@ -123,6 +135,18 @@ class BroadcastRouter {
               // Send text message if image doesn't exist
               await bot.sendMessage(user.chat_id, post.description);
             }
+            
+            // Update user's updatedAt timestamp after successful send
+            try {
+              await this.broadcastService.prisma.user.update({
+                where: { chat_id: user.chat_id },
+                data: { updatedAt: new Date() }
+              });
+            } catch (updateError) {
+              console.error(`Failed to update user timestamp for ${user.chat_id}:`, updateError);
+              // Don't fail the post sending if timestamp update fails
+            }
+            
             sentCount++;
           } catch (error) {
             console.error(`Error sending to user ${user.chat_id}:`, error);

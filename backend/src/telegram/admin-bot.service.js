@@ -69,16 +69,29 @@ class AdminBotService {
 				where: { chat_id: couponCode.chat_id }
 			});
 
-			const userInfo = user ?
-				`${user.first_name || user.user_name || 'Неизвестно'} (${couponCode.chat_id})` :
-				`Пользователь (${couponCode.chat_id})`;
+			if (!user) {
+				await this.bot.sendMessage(chatId, `❌ Пользователь с chat_id "${couponCode.chat_id}" не найден.`);
+				return;
+			}
 
-			// Create message with coupon info
+			// Check user subscription status using SubscriptionService
+			// Note: SubscriptionService.checkSubscription already updates the database
+			const subscriptionStatus = await this.checkUserSubscription(user);
+
+			// Get channel info for display
+			const SubscriptionService = require('./subscription.service');
+			const subscriptionService = new SubscriptionService();
+			await subscriptionService.initialize(this.bot);
+
+			const subscriptionEmoji = subscriptionStatus ? '✅' : '❌';
+			const subscriptionText = subscriptionStatus ? 'Подписан на канал' : 'НЕ подписан на канал';
+
+			// Create message with coupon info and subscription status
 			const message = `🔍 **Информация о купоне**\n\n` +
 				`📋 **Код:**\n\`${couponCode.code}\`\n` +
 				`📊 **Максимум использований:** ${couponCode.max_uses}\n` +
 				`✅ **Использовано раз:** ${couponCode.uses_count}\n` +
-				`👤 **Пользователь:** ${userInfo}\n` +
+				`📺 **Подписка:** ${subscriptionEmoji} ${subscriptionText}\n` +
 				`🎯 **Акция:** ${couponCode.sales_rule.name}\n` +
 				`📝 **Описание:** ${couponCode.sales_rule.description || 'Нет описания'}`;
 
@@ -187,6 +200,41 @@ class AdminBotService {
 		} catch (error) {
 			console.error('Error using coupon:', error);
 			await this.bot.sendMessage(chatId, '❌ Произошла ошибка при использовании купона.');
+		}
+	}
+
+	async checkUserSubscription(user) {
+		try {
+			// Use existing SubscriptionService instead of duplicating logic
+			const SubscriptionService = require('./subscription.service');
+			const subscriptionService = new SubscriptionService();
+
+			// Initialize with admin bot
+			await subscriptionService.initialize(this.bot);
+
+			// Check subscription using chat_id (existing method)
+			const result = await subscriptionService.checkSubscription(user.chat_id);
+
+			return result.isSubscribed;
+		} catch (error) {
+			console.error('Error checking user subscription:', error);
+			return false;
+		}
+	}
+
+	async updateUserSubscriptionStatus(userId, isSubscribed) {
+		try {
+			// Update user's subscription status and updatedAt timestamp
+			await this.prisma.user.update({
+				where: { id: userId },
+				data: {
+					is_subscriber: isSubscribed,
+					updatedAt: new Date()
+				}
+			});
+			console.log(`Updated subscription status for user ${userId}: ${isSubscribed}`);
+		} catch (error) {
+			console.error('Error updating user subscription status:', error);
 		}
 	}
 
