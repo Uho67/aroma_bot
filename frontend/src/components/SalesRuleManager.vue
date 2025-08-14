@@ -21,7 +21,7 @@
                 <th>ID</th>
                 <th>Название</th>
                 <th>Описание</th>
-                <th>Ссылка админа</th>
+
                 <th>Изображение</th>
                 <th>Макс. использований</th>
                 <th>Дата создания</th>
@@ -33,13 +33,7 @@
                 <td>{{ rule.id }}</td>
                 <td>{{ rule.name }}</td>
                 <td>{{ rule.description || '-' }}</td>
-                <td>
-                  <a v-if="rule.admin_link" :href="rule.admin_link" target="_blank" class="text-decoration-none">
-                    <i class="fas fa-external-link-alt me-1"></i>
-                    Ссылка
-                  </a>
-                  <span v-else class="text-muted">Нет</span>
-                </td>
+
                 <td>
                   <img v-if="rule.image" :src="rule.image" alt="Rule image" class="img-thumbnail" style="width: 50px; height: 50px; object-fit: cover;">
                   <span v-else class="text-muted">Нет</span>
@@ -92,10 +86,7 @@
                 <label class="form-label">Описание</label>
                 <textarea class="form-control" v-model="form.description" rows="3"></textarea>
               </div>
-              <div class="mb-3">
-                <label class="form-label">Ссылка для админа</label>
-                <input type="url" class="form-control" v-model="form.admin_link" placeholder="https://example.com">
-              </div>
+
               <div class="mb-3">
                 <label class="form-label">Изображение</label>
                 <input 
@@ -173,7 +164,6 @@ export default {
         name: '',
         description: '',
         image: '',
-        admin_link: '',
         max_uses: 1
       },
       imageFile: null,
@@ -274,17 +264,26 @@ export default {
       }
     },
     async deleteRule(id) {
-      if (confirm('Вы уверены, что хотите удалить это правило?')) {
+      if (confirm('Вы уверены, что хотите удалить это правило? Это также удалит все связанные купоны и обновит пользователей.')) {
         try {
           const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3008';
+          console.log(`🗑️ Deleting sales rule ${id}...`);
+          
           const response = await fetch(`${API_URL}/api/sales-rules/${id}`, {
             method: 'DELETE'
           });
+          
           if (response.ok) {
+            console.log(`✅ Sales rule ${id} deleted successfully`);
             await this.loadSalesRules();
+            alert('Правило продаж успешно удалено!');
+          } else {
+            const errorData = await response.json();
+            throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
           }
         } catch (error) {
           console.error('Error deleting rule:', error);
+          alert('Ошибка при удалении правила: ' + error.message);
         }
       }
     },
@@ -321,7 +320,6 @@ export default {
         name: '',
         description: '',
         image: '',
-        admin_link: '',
         max_uses: 1
       };
       this.currentRule = null;

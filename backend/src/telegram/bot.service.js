@@ -200,10 +200,19 @@ class BotService {
       const salesRule = couponCode.sales_rule;
       const code = couponCode.code;
 
-      // Create admin button with pre-filled message
+      // Get admin_path from configuration
+      const configHelper = require('../configuration/config-helper');
+      const adminPath = await configHelper.get('admin_path');
+
+      if (!adminPath) {
+        console.error('admin_path configuration not found');
+        return;
+      }
+
+      // Create admin button with pre-filled message using admin_path config
       const adminButton = {
         text: 'Получить скидку',
-        url: `${salesRule.admin_link}?text=${encodeURIComponent(`Доброго дня, бажаю зробити замовлення з SalesCode:\n${code}`)}`
+        url: `${adminPath}?text=${encodeURIComponent(`Доброго дня, бажаю зробити замовлення з SalesCode:\n${code}`)}`
       };
 
       const keyboard = {

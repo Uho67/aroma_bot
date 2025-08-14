@@ -26,7 +26,7 @@ class SubscriptionService {
 	}
 
 	/**
- * Check if user is subscribed to the channel
+ * Check if user is subscribed to the channel by chat_id
  * @param {string} chatId - User's chat ID
  * @returns {Promise<Object>} Subscription status
  */
@@ -40,7 +40,7 @@ class SubscriptionService {
 			}
 
 			// Get channel info first
-			const channelInfo = await this.adminBot.getChat(`@${this.channelUsername}`);
+			const channelInfo = await this.adminBot.getChat(this.channelUsername);
 			if (!channelInfo) {
 				return {
 					isSubscribed: false,
@@ -49,7 +49,95 @@ class SubscriptionService {
 			}
 
 			// Check user's membership in the channel
-			const member = await this.adminBot.getChatMember(`@${this.channelUsername}`, chatId);
+			const member = await this.adminBot.getChatMember(this.channelUsername, chatId);
+
+			if (!member) {
+				return {
+					isSubscribed: false,
+					error: 'Could not get member info'
+				};
+			}
+
+			// Check subscription status based on member status
+			const isSubscribed = this.isValidMemberStatus(member.status);
+
+			// Update user's subscription status in database
+			try {
+				const { PrismaClient } = require('@prisma/client');
+				const prisma = new PrismaClient();
+
+				await prisma.user.update({
+					where: { chat_id: chatId },
+					data: {
+						is_subscriber: isSubscribed,
+						updatedAt: new Date() // Update the timestamp
+					}
+				});
+
+				await prisma.$disconnect();
+			} catch (dbError) {
+				console.error('Error updating user subscription status:', dbError);
+				// Don't fail the subscription check if DB update fails
+			}
+
+			return {
+				isSubscribed,
+				status: member.status,
+				channelTitle: channelInfo.title,
+				channelUsername: this.channelUsername,
+				memberInfo: member
+			};
+
+		} catch (error) {
+			console.error('Error checking subscription:', error);
+
+			// Handle specific Telegram errors
+			if (error.code === 'ETELEGRAM') {
+				if (error.response.statusCode === 403) {
+					return {
+						isSubscribed: false,
+						error: 'Admin bot is not admin of the channel'
+					};
+				} else if (error.response.statusCode === 400) {
+					return {
+						isSubscribed: false,
+						error: 'Invalid channel username or user not found'
+					};
+				}
+			}
+
+			return {
+				isSubscribed: false,
+				error: error.message
+			};
+		}
+	}
+
+	/**
+	 * Check if user is subscribed to the channel by telegram_user_id
+	 * @param {number} telegramUserId - User's Telegram user ID
+	 * @returns {Promise<Object>} Subscription status
+	 */
+	async checkSubscriptionByTelegramId(telegramUserId) {
+		try {
+			if (!this.adminBot || !this.channelUsername) {
+				return {
+					isSubscribed: false,
+					error: 'Subscription service not properly configured'
+				};
+			}
+
+			// Get channel info first
+			const channelInfo = await this.adminBot.getChat(this.channelUsername);
+			if (!channelInfo) {
+				return {
+					isSubscribed: false,
+					error: 'Channel not found or admin bot is not admin'
+				};
+			}
+
+			// Check user's membership in the channel using telegram_user_id
+			const member = await this.adminBot.getChatMember(channelInfo.id, telegramUserId);
 
 			if (!member) {
 				return {
@@ -70,7 +158,7 @@ class SubscriptionService {
 			};
 
 		} catch (error) {
-			console.error('Error checking subscription:', error);
+			console.error('Error checking subscription by telegram ID:', error);
 
 			// Handle specific Telegram errors
 			if (error.code === 'ETELEGRAM') {
@@ -147,14 +235,14 @@ class SubscriptionService {
 		}
 	}
 
-	  /**
-   * Close admin bot connection
-   */
-  async disconnect() {
-    if (this.adminBot) {
-      await this.adminBot.close();
-    }
-  }
+	/**
+ * Close admin bot connection
+ */
+	async disconnect() {
+		if (this.adminBot) {
+			await this.adminBot.close();
+		}
+	}
 }
 
 module.exports = SubscriptionService; 

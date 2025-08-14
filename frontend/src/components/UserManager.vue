@@ -31,6 +31,14 @@
               <i v-else class="fas fa-tags"></i>
               {{ offeringPromotion ? 'Создание...' : 'Предложить акцию' }}
             </button>
+            
+            <!-- Subscription Check Button -->
+            <div class="vr mx-2"></div>
+            <button @click="checkSubscriptions" class="btn btn-info" :disabled="selectedUsers.length === 0 || checkingSubscriptions">
+              <span v-if="checkingSubscriptions" class="spinner-border spinner-border-sm me-1"></span>
+              <i v-else class="fas fa-bell"></i>
+              {{ checkingSubscriptions ? 'Проверка...' : `Проверить подписку (${selectedUsers.length})` }}
+            </button>
           </div>
           <button @click="loadUsers" class="btn btn-outline-primary" :disabled="loading">
             <i class="fas fa-sync-alt" :class="{ 'fa-spin': loading }"></i>
@@ -138,6 +146,16 @@
                        </div>
                        <div class="col-md-2">
                          <label class="form-label small text-muted fw-medium">
+                           <i class="fas fa-bell me-1"></i>Подписка
+                         </label>
+                         <select v-model="subscriptionFilter" class="form-select">
+                           <option value="">Все</option>
+                           <option value="subscribed">Подписанные</option>
+                           <option value="not_subscribed">Не подписанные</option>
+                         </select>
+                       </div>
+                       <div class="col-md-2">
+                         <label class="form-label small text-muted fw-medium">
                            <i class="fas fa-calendar me-1"></i>Дата с
                          </label>
                          <input 
@@ -151,6 +169,24 @@
                          </label>
                          <input 
                            v-model="dateTo" 
+                           type="date" 
+                           class="form-control">
+                       </div>
+                       <div class="col-md-2">
+                         <label class="form-label small text-muted fw-medium">
+                           <i class="fas fa-clock me-1"></i>Обновление с
+                         </label>
+                         <input 
+                           v-model="updatedFrom" 
+                           type="date" 
+                           class="form-control">
+                       </div>
+                       <div class="col-md-2">
+                         <label class="form-label small text-muted fw-medium">
+                           <i class="fas fa-clock me-1"></i>Обновление по
+                         </label>
+                         <input 
+                           v-model="updatedTo" 
                            type="date" 
                            class="form-control">
                        </div>
@@ -181,6 +217,10 @@
                            <i class="fas fa-user-check me-1"></i>{{ statusFilter === 'active' ? 'Активные' : 'Заблокированные' }}
                            <button @click="statusFilter = ''" class="btn-close btn-close-sm ms-1" style="font-size: 0.6em;"></button>
                          </span>
+                         <span v-if="subscriptionFilter" class="badge bg-light text-dark border">
+                           <i class="fas fa-bell me-1"></i>{{ subscriptionFilter === 'subscribed' ? 'Подписанные' : 'Не подписанные' }}
+                           <button @click="subscriptionFilter = ''" class="btn-close btn-close-sm ms-1" style="font-size: 0.6em;"></button>
+                         </span>
                          <span v-if="dateFrom" class="badge bg-light text-dark border">
                            <i class="fas fa-calendar me-1"></i>С {{ formatDateShort(dateFrom) }}
                            <button @click="dateFrom = ''" class="btn-close btn-close-sm ms-1" style="font-size: 0.6em;"></button>
@@ -188,6 +228,14 @@
                          <span v-if="dateTo" class="badge bg-light text-dark border">
                            <i class="fas fa-calendar me-1"></i>По {{ formatDateShort(dateTo) }}
                            <button @click="dateTo = ''" class="btn-close btn-close-sm ms-1" style="font-size: 0.6em;"></button>
+                         </span>
+                         <span v-if="updatedFrom" class="badge bg-light text-dark border">
+                           <i class="fas fa-clock me-1"></i>Обновление с {{ formatDateShort(updatedFrom) }}
+                           <button @click="updatedFrom = ''" class="btn-close btn-close-sm ms-1" style="font-size: 0.6em;"></button>
+                         </span>
+                         <span v-if="updatedTo" class="badge bg-light text-dark border">
+                           <i class="fas fa-clock me-1"></i>Обновление по {{ formatDateShort(updatedTo) }}
+                           <button @click="updatedTo = ''" class="btn-close btn-close-sm ms-1" style="font-size: 0.6em;"></button>
                          </span>
                        </div>
                      </div>
@@ -224,8 +272,10 @@
                       <th>Username</th>
                       <th>Chat ID</th>
                       <th>Статус</th>
+                      <th>Подписка</th>
+                      <th>Правила продаж</th>
                       <th>Дата регистрации</th>
-                      <th>Сообщения</th>
+                      <th>Последнее обновление</th>
                       <th>Действия</th>
                     </tr>
                   </thead>
@@ -254,10 +304,44 @@
                       <span v-else class="badge bg-success">Активен</span>
                     </td>
                     <td>
+                      <span v-if="user.is_subscriber" class="badge bg-success">
+                        <i class="fas fa-check-circle me-1"></i>Подписан
+                      </span>
+                      <span v-else class="badge bg-secondary">
+                        <i class="fas fa-times-circle me-1"></i>Не подписан
+                      </span>
+                    </td>
+                    <td>
+                      <div class="d-flex align-items-center">
+                        <div v-if="user.userSalesRules && user.userSalesRules.length > 0" class="me-2">
+                          <div class="mb-1 d-flex justify-content-between align-items-center">
+                            <small class="text-muted">ID правил:</small>
+                            <span class="badge bg-info small">{{ user.userSalesRules.length }} правил</span>
+                          </div>
+                          <div class="d-flex flex-wrap gap-1">
+                            <span v-for="rule in user.userSalesRules" 
+                                  :key="rule.id" 
+                                  class="badge bg-secondary small"
+                                  :title="rule.salesRule.name">
+                              {{ rule.salesRule.id }}
+                            </span>
+                          </div>
+                        </div>
+                        <button 
+                          @click="editSalesRules(user)" 
+                          class="btn btn-sm btn-outline-primary"
+                          title="Редактировать правила продаж">
+                          <i class="fas fa-edit"></i>
+                        </button>
+                      </div>
+                    </td>
+                    <td>
                       {{ formatDate(user.createdAt) }}
                     </td>
                     <td>
-                      <span class="badge bg-info">{{ user.messages ? user.messages.length : 0 }}</span>
+                      <span class="text-muted small">
+                        {{ formatDate(user.updatedAt) }}
+                      </span>
                     </td>
                     <td>
                       <div class="btn-group btn-group-sm">
@@ -274,6 +358,12 @@
                           class="btn btn-outline-success"
                           title="Разблокировать">
                           <i class="fas fa-check"></i>
+                        </button>
+                        <button 
+                          @click="checkSingleSubscription(user.chat_id)" 
+                          class="btn btn-outline-info"
+                          title="Проверить подписку">
+                          <i class="fas fa-bell"></i>
                         </button>
                       </div>
                     </td>
@@ -334,6 +424,185 @@
        </div>
      </div>
    </div>
+   
+   <!-- Subscription Results Modal -->
+   <div v-if="subscriptionResults" class="modal fade show d-block" style="background-color: rgba(0,0,0,0.5);" tabindex="-1">
+     <div class="modal-dialog modal-lg">
+       <div class="modal-content">
+         <div class="modal-header">
+           <h5 class="modal-title">
+             <i class="fas fa-bell text-info me-2"></i>
+             Результаты проверки подписки
+           </h5>
+           <button type="button" class="btn-close" @click="subscriptionResults = null"></button>
+         </div>
+         <div class="modal-body">
+           <div class="row mb-3">
+             <div class="col-md-6">
+               <div class="card text-center">
+                 <div class="card-body">
+                   <h6 class="card-title">Подписанные</h6>
+                   <h3 class="text-success">{{ subscriptionResults.subscribed?.length || 0 }}</h3>
+                 </div>
+               </div>
+             </div>
+             <div class="col-md-6">
+               <div class="card text-center">
+                 <div class="card-body">
+                   <h6 class="card-title">Не подписанные</h6>
+                   <h3 class="text-danger">{{ subscriptionResults.notSubscribed?.length || 0 }}</h3>
+                 </div>
+               </div>
+             </div>
+           </div>
+           
+           <!-- Subscribed Users -->
+           <div v-if="subscriptionResults.subscribed && subscriptionResults.subscribed.length > 0" class="mb-4">
+             <h6 class="text-success mb-3">
+               <i class="fas fa-check-circle me-2"></i>
+               Подписанные пользователи ({{ subscriptionResults.subscribed.length }})
+             </h6>
+             <div class="table-responsive">
+               <table class="table table-sm table-success">
+                 <thead>
+                   <tr>
+                     <th>Имя</th>
+                     <th>Username</th>
+                     <th>Chat ID</th>
+                     <th>Статус</th>
+                   </tr>
+                 </thead>
+                 <tbody>
+                   <tr v-for="user in subscriptionResults.subscribed" :key="user.chatId">
+                     <td>{{ user.firstName }} {{ user.lastName }}</td>
+                     <td>
+                       <span v-if="user.userName">@{{ user.userName }}</span>
+                       <span v-else class="text-muted">—</span>
+                     </td>
+                     <td><code>{{ user.chatId }}</code></td>
+                     <td>
+                       <span class="badge bg-success">{{ user.status }}</span>
+                     </td>
+                   </tr>
+                 </tbody>
+               </table>
+             </div>
+           </div>
+           
+           <!-- Not Subscribed Users -->
+           <div v-if="subscriptionResults.notSubscribed && subscriptionResults.notSubscribed.length > 0" class="mb-4">
+             <h6 class="text-danger mb-3">
+               <i class="fas fa-times-circle me-2"></i>
+               Не подписанные пользователи ({{ subscriptionResults.notSubscribed.length }})
+             </h6>
+             <div class="table-responsive">
+               <table class="table table-sm table-danger">
+                 <thead>
+                   <tr>
+                     <th>Имя</th>
+                     <th>Username</th>
+                     <th>Chat ID</th>
+                     <th>Ошибка</th>
+                   </tr>
+                 </thead>
+                 <tbody>
+                   <tr v-for="user in subscriptionResults.notSubscribed" :key="user.chatId">
+                     <td>{{ user.firstName }} {{ user.lastName }}</td>
+                     <td>
+                       <span v-if="user.userName">@{{ user.userName }}</span>
+                       <span v-else class="text-muted">—</span>
+                     </td>
+                     <td><code>{{ user.chatId }}</code></td>
+                     <td>
+                       <small class="text-danger">{{ user.error || 'Не подписан' }}</small>
+                     </td>
+                   </tr>
+                 </tbody>
+               </table>
+             </div>
+           </div>
+           
+           <!-- Channel Info -->
+           <div v-if="subscriptionResults.channelInfo" class="mt-4 p-3 bg-light rounded">
+             <h6 class="mb-2">
+               <i class="fas fa-info-circle me-2"></i>
+               Информация о канале
+             </h6>
+             <div class="row">
+               <div class="col-md-6">
+                 <strong>Название:</strong> {{ subscriptionResults.channelInfo.title }}
+               </div>
+               <div class="col-md-6">
+                 <strong>Username:</strong> @{{ subscriptionResults.channelInfo.username }}
+               </div>
+             </div>
+           </div>
+         </div>
+         <div class="modal-footer">
+           <button type="button" class="btn btn-secondary" @click="subscriptionResults = null">
+             Закрыть
+           </button>
+         </div>
+       </div>
+     </div>
+   </div>
+   
+   <!-- Sales Rules Editing Modal -->
+   <div v-if="salesRulesModal" class="modal fade show d-block" style="background-color: rgba(0,0,0,0.5);" tabindex="-1">
+     <div class="modal-dialog">
+       <div class="modal-content">
+         <div class="modal-header">
+           <h5 class="modal-title">
+             <i class="fas fa-tags text-primary me-2"></i>
+             Редактировать правила продаж пользователя
+           </h5>
+           <button type="button" class="btn-close" @click="closeSalesRulesModal"></button>
+         </div>
+         <div class="modal-body">
+           <div class="mb-3">
+             <label class="form-label">
+               <strong>{{ editingSalesRules?.first_name }} {{ editingSalesRules?.last_name }}</strong>
+               <br>
+               <small class="text-muted">Chat ID: {{ editingSalesRules?.chat_id }}</small>
+             </label>
+           </div>
+           
+           <div class="mb-3">
+             <label class="form-label">Правила продаж (ID через запятую)</label>
+             <textarea 
+               v-model="editingSalesRules.sales_rules" 
+               class="form-control" 
+               rows="4"
+               placeholder="Введите ID правил продаж через запятую, например: 1,2,3">
+             </textarea>
+             <div class="form-text">
+               Введите ID правил продаж через запятую. Оставьте пустым, чтобы очистить.
+             </div>
+           </div>
+           
+           <div v-if="editingSalesRules?.sales_rules" class="mb-3">
+             <label class="form-label">Текущие правила продаж:</label>
+             <div class="p-2 bg-light rounded">
+               <span v-for="(id, index) in editingSalesRules.sales_rules.split(',').filter(id => id.trim())" 
+                     :key="index" 
+                     class="badge bg-info me-1 mb-1">
+                 ID: {{ id.trim() }}
+               </span>
+             </div>
+           </div>
+         </div>
+         <div class="modal-footer">
+           <button type="button" class="btn btn-secondary" @click="closeSalesRulesModal">
+             Отмена
+           </button>
+           <button type="button" class="btn btn-primary" @click="saveSalesRules">
+             <i class="fas fa-save me-1"></i>
+             Сохранить
+           </button>
+         </div>
+       </div>
+     </div>
+   </div>
  </template>
 
 <script>
@@ -353,8 +622,11 @@ export default {
       itemsPerPage: 50,
       searchQuery: '',
       statusFilter: '',
+      subscriptionFilter: '',
       dateFrom: '',
       dateTo: '',
+      updatedFrom: '',
+      updatedTo: '',
       pagination: {
         total: 0,
         totalPages: 0,
@@ -368,7 +640,11 @@ export default {
       sendError: null,
       salesRules: [],
       selectedSalesRuleId: '',
-      offeringPromotion: false
+      offeringPromotion: false,
+      checkingSubscriptions: false,
+      subscriptionResults: null,
+      editingSalesRules: null,
+      salesRulesModal: false
     };
   },
   async created() {
@@ -410,15 +686,21 @@ export default {
     hasFilterValues() {
       return this.searchQuery.trim() || 
              this.statusFilter || 
+             this.subscriptionFilter || 
              this.dateFrom || 
-             this.dateTo;
+             this.dateTo ||
+             this.updatedFrom ||
+             this.updatedTo;
     },
     activeFiltersCount() {
       let count = 0;
       if (this.searchQuery.trim()) count++;
       if (this.statusFilter) count++;
+      if (this.subscriptionFilter) count++;
       if (this.dateFrom) count++;
       if (this.dateTo) count++;
+      if (this.updatedFrom) count++;
+      if (this.updatedTo) count++;
       return count;
     },
     allUsersSelected() {
@@ -452,12 +734,24 @@ export default {
           params.status = this.statusFilter;
         }
         
+        if (this.subscriptionFilter) {
+          params.subscription = this.subscriptionFilter;
+        }
+        
         if (this.dateFrom) {
           params.dateFrom = this.dateFrom;
         }
         
         if (this.dateTo) {
           params.dateTo = this.dateTo;
+        }
+        
+        if (this.updatedFrom) {
+          params.updatedFrom = this.updatedFrom;
+        }
+        
+        if (this.updatedTo) {
+          params.updatedTo = this.updatedTo;
         }
         
         const response = await axios.get(`${API_URL}/api/users`, { params });
@@ -495,8 +789,11 @@ export default {
       clearFilters() {
         this.searchQuery = '';
         this.statusFilter = '';
+        this.subscriptionFilter = '';
         this.dateFrom = '';
         this.dateTo = '';
+        this.updatedFrom = '';
+        this.updatedTo = '';
         this.currentPage = 1;
         this.loadUsers();
       },
@@ -576,6 +873,43 @@ export default {
           this.offeringPromotion = false;
         }
       },
+      
+      async checkSubscriptions() {
+        if (this.selectedUsers.length === 0) {
+          alert('Пожалуйста, выберите пользователей для проверки подписки.');
+          return;
+        }
+
+        this.checkingSubscriptions = true;
+        this.subscriptionResults = null;
+
+        try {
+          const response = await axios.post(`${API_URL}/api/users/check-subscriptions`, {
+            userIds: this.selectedUsers
+          });
+          this.subscriptionResults = response.data;
+        } catch (error) {
+          console.error('Error checking subscriptions:', error);
+          alert('Ошибка при проверке подписки: ' + (error.response?.data?.error || error.message));
+        } finally {
+          this.checkingSubscriptions = false;
+        }
+      },
+
+      async checkSingleSubscription(chatId) {
+        this.checkingSubscriptions = true;
+        this.subscriptionResults = null;
+
+        try {
+          const response = await axios.post(`${API_URL}/api/users/${chatId}/check-subscription`);
+          this.subscriptionResults = response.data;
+        } catch (error) {
+          console.error('Error checking single subscription:', error);
+          alert('Ошибка при проверке подписки: ' + (error.response?.data?.error || error.message));
+        } finally {
+          this.checkingSubscriptions = false;
+        }
+      },
       formatDate(dateString) {
         const date = new Date(dateString);
         // Format UTC date without timezone conversion
@@ -595,6 +929,48 @@ export default {
         const day = String(date.getUTCDate()).padStart(2, '0');
         
         return `${day}.${month}.${year}`;
+      },
+      
+      editSalesRules(user) {
+        // Convert userSalesRules to comma-separated string for editing
+        const salesRulesString = user.userSalesRules 
+          ? user.userSalesRules.map(rule => rule.salesRule.id).join(',')
+          : '';
+        
+        this.editingSalesRules = { 
+          ...user, 
+          sales_rules: salesRulesString 
+        };
+        this.salesRulesModal = true;
+      },
+      
+      async saveSalesRules() {
+        if (!this.editingSalesRules) return;
+        
+        try {
+          const response = await axios.put(`${API_URL}/api/users/${this.editingSalesRules.chat_id}/sales-rules`, {
+            sales_rules: this.editingSalesRules.sales_rules
+          });
+          
+          if (response.data.success) {
+            // Update the user in the local list
+            const userIndex = this.users.findIndex(u => u.chat_id === this.editingSalesRules.chat_id);
+            if (userIndex !== -1) {
+              this.users[userIndex].sales_rules = this.editingSalesRules.sales_rules;
+            }
+            
+            this.salesRulesModal = false;
+            this.editingSalesRules = null;
+          }
+        } catch (error) {
+          console.error('Error updating sales_rules:', error);
+          alert('Ошибка при обновлении правил продаж: ' + (error.response?.data?.error || error.message));
+        }
+      },
+      
+      closeSalesRulesModal() {
+        this.salesRulesModal = false;
+        this.editingSalesRules = null;
       }
         }
 };
@@ -694,5 +1070,45 @@ code {
 
 .position-relative .btn:hover {
   background: rgba(108, 117, 125, 0.1);
+}
+
+/* Subscription Modal Styles */
+.modal.show {
+  display: block !important;
+}
+
+.modal-backdrop {
+  display: none;
+}
+
+.modal-dialog {
+  max-width: 800px;
+}
+
+.table-sm td, .table-sm th {
+  padding: 0.5rem;
+  font-size: 0.875rem;
+}
+
+.table-success {
+  background-color: rgba(25, 135, 84, 0.1);
+}
+
+.table-danger {
+  background-color: rgba(220, 53, 69, 0.1);
+}
+
+.badge {
+  font-size: 0.75em;
+  padding: 0.35em 0.65em;
+}
+
+.badge.small {
+  font-size: 0.65em;
+  padding: 0.25em 0.5em;
+}
+
+.gap-1 {
+  gap: 0.25rem;
 }
 </style> 
