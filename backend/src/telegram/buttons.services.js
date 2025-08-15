@@ -66,6 +66,11 @@ class ButtonsService {
         buttonUrl += '?text=' + encodeURIComponent('Добрий день! Хочу зробити замовлення');
       }
 
+      // For sales buttons, add coupon code if available
+      if (button.render_type === 'sales' && button.value === 'config') {
+        buttonUrl = adminPath || button.value;
+      }
+
       const buttonConfig = {
         text: button.name,
         [button.type === 'url' ? 'url' : 'callback_data']: buttonUrl
@@ -76,6 +81,8 @@ class ButtonsService {
         buttonConfig.text = '🔗 ' + buttonConfig.text;
       } else if (button.value === 'catalog') {
         buttonConfig.text = '📋 ' + buttonConfig.text;
+      } else if (button.render_type === 'sales') {
+        buttonConfig.text = '🎯 ' + buttonConfig.text;
       }
 
       // Add button to current row
@@ -132,6 +139,60 @@ class ButtonsService {
     return await this.prisma.buttonSettings.delete({
       where: { id }
     });
+  }
+
+  /**
+   * Get sales buttons with optional coupon context
+   * @param {string} couponCode - Optional coupon code to include in button URLs
+   * @returns {Object} Keyboard configuration
+   */
+  async getSalesButtons(couponCode = null) {
+    const buttons = await this.prisma.buttonSettings.findMany({
+      where: {
+        render_type: 'sales'
+      },
+      orderBy: {
+        order: 'asc'
+      }
+    });
+
+    const keyboard = [];
+    let currentRow = [];
+
+    // Get admin_path configuration once
+    const configHelper = require('../configuration/config-helper');
+    const adminPath = await configHelper.get('admin_path', '');
+
+    for (let i = 0; i < buttons.length; i++) {
+      const button = buttons[i];
+      let buttonUrl = button.value;
+
+      // For sales buttons with value "config", use the admin_path configuration
+      if (button.value === 'config') {
+        buttonUrl = adminPath || button.value;
+
+        // Add coupon code to URL if provided
+        if (couponCode) {
+          buttonUrl += `?text=${encodeURIComponent(`Доброго дня, бажаю зробити замовлення з SalesCode:\n${couponCode}`)}`;
+        }
+      }
+
+      const buttonConfig = {
+        text: '🎯 ' + button.name,
+        [button.type === 'url' ? 'url' : 'callback_data']: buttonUrl
+      };
+
+      // Add button to current row
+      currentRow.push(buttonConfig);
+
+      // If we have 2 buttons in the row or this is the last button, add the row to keyboard
+      if (currentRow.length === 2 || i === buttons.length - 1) {
+        keyboard.push(currentRow);
+        currentRow = [];
+      }
+    }
+
+    return { inline_keyboard: keyboard };
   }
 }
 module.exports = ButtonsService;

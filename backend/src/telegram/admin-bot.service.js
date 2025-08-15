@@ -105,6 +105,11 @@ class AdminBotService {
 				message += `\n\n⚠️ **ВНИМАНИЕ:** Купон уже полностью использован!`;
 			}
 
+			// Get sales buttons (render_type = 'sales') with coupon context
+			const ButtonsService = require('./buttons.services');
+			const buttonsService = new ButtonsService();
+			const salesButtons = await buttonsService.getSalesButtons(couponCode.code);
+
 			// Create inline keyboard based on coupon usage status
 			let keyboard;
 			if (isFullyUsed) {
@@ -127,6 +132,13 @@ class AdminBotService {
 						}
 					]]
 				};
+			}
+
+			// Add sales buttons if they exist
+			if (salesButtons.inline_keyboard && salesButtons.inline_keyboard.length > 0) {
+				salesButtons.inline_keyboard.forEach(row => {
+					keyboard.inline_keyboard.push(row);
+				});
 			}
 
 			await this.bot.sendMessage(chatId, message, {
@@ -205,13 +217,43 @@ class AdminBotService {
 				}
 			});
 
+			// Get sales buttons (render_type = 'sales') with coupon context
+			const ButtonsService = require('./buttons.services');
+			const buttonsService = new ButtonsService();
+			const salesButtons = await buttonsService.getSalesButtons(couponCode.code);
+
+			// Get admin_path configuration
+			const configHelper = require('../configuration/config-helper');
+			const adminPath = await configHelper.get('admin_path');
+
 			// Send success message
 			const successMessage = `✅ **Купон использован!**\n\n` +
 				`📋 **Код:**\n\`${couponCode.code}\`\n` +
 				`📊 **Использовано:** ${updatedCoupon.uses_count}/${couponCode.max_uses}\n` +
-				`⏰ **Время использования:** ${new Date().toLocaleString('ru-RU')}`;
+				`⏰ **Время использования:** ${new Date().toLocaleString('ru-RU')}\n\n` +
+				`💬 **Перейдите по ссылке ниже для оформления заказа:**`;
 
-			await this.bot.sendMessage(chatId, successMessage, { parse_mode: 'Markdown' });
+			// Create keyboard with order button and sales buttons
+			let keyboard = {
+				inline_keyboard: [[
+					{
+						text: '🎯 ОТРИМАТИ ЗНИЖКУ 🎯',
+						url: `${adminPath}?text=${encodeURIComponent(`Доброго дня, бажаю зробити замовлення з SalesCode:\n${couponCode.code}`)}`
+					}
+				]]
+			};
+
+			// Add sales buttons if they exist
+			if (salesButtons.inline_keyboard && salesButtons.inline_keyboard.length > 0) {
+				salesButtons.inline_keyboard.forEach(row => {
+					keyboard.inline_keyboard.push(row);
+				});
+			}
+
+			await this.bot.sendMessage(chatId, successMessage, {
+				parse_mode: 'Markdown',
+				reply_markup: keyboard
+			});
 
 			// Update the original message to show it's been used
 			const updatedKeyboard = {
