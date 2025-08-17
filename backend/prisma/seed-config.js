@@ -9,12 +9,12 @@ async function seedConfigurations() {
 		// Initial configurations
 		const initialConfigs = [
 			{
-				path: 'admin_url',
-				value: 'https://t.me/your_admin_bot'
-			},
-			{
 				path: 'channel',
 				value: 'https://t.me/your_channel'
+			},
+			{
+				path: 'channel_username',
+				value: 'your_channel'
 			},
 			{
 				path: 'admin_path',

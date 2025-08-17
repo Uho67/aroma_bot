@@ -49,6 +49,7 @@
             <option value="welcome_button">Welcome Button</option>
             <option value="catalog_menu">Catalog Menu</option>
             <option value="order">Заказ</option>
+            <option value="sales">Для рекламных акций</option>
           </select>
         </div>
 

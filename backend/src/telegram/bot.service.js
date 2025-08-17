@@ -77,7 +77,7 @@ class BotService {
       const chatId = callbackQuery.message.chat.id;
       const data = callbackQuery.data;
 
-      if (data === 'welcome') {
+      if (data === 'welcome' || data === 'start') {
         this.sendStartMessage(this.bot, chatId);
       }
 
@@ -200,15 +200,51 @@ class BotService {
       const salesRule = couponCode.sales_rule;
       const code = couponCode.code;
 
-      // Create admin button with pre-filled message
+      // Get admin_path from configuration
+      const configHelper = require('../configuration/config-helper');
+      const adminPath = await configHelper.get('admin_path');
+
+      if (!adminPath) {
+        console.error('admin_path configuration not found');
+        return;
+      }
+
+      // Create admin button with pre-filled message using admin_path config
       const adminButton = {
-        text: 'Получить скидку',
-        url: `${salesRule.admin_link}?text=${encodeURIComponent(`Доброго дня, бажаю зробити замовлення з SalesCode:\n${code}`)}`
+        text: '🎯 ОТРИМАТИ ЗНИЖКУ 🎯',
+        url: `${adminPath}?text=${encodeURIComponent(`Доброго дня, бажаю зробити замовлення з SalesCode:\n${code}`)}`
       };
 
-      const keyboard = {
-        inline_keyboard: [[adminButton]]
+      // Create main menu button that sends /start command to bot
+      const mainMenuButton = {
+        text: '🏠 Головне меню',
+        callback_data: 'start'
       };
+
+      // Get sales buttons (render_type = 'sales') with coupon context
+      const ButtonsService = require('./buttons.services');
+      const buttonsService = new ButtonsService();
+      const salesButtons = await buttonsService.getSalesButtons(code);
+
+      // Create keyboard structure:
+      // Row 1: "Получить скидку" button
+      // Row 2: Sales buttons (if any)
+      // Row 3: "Головне меню" button
+      let keyboard = {
+        inline_keyboard: [
+          [adminButton]  // Row 1: Получить скидку
+        ]
+      };
+
+      // Add sales buttons if they exist (Row 2)
+      if (salesButtons.inline_keyboard && salesButtons.inline_keyboard.length > 0) {
+        salesButtons.inline_keyboard.forEach(row => {
+          keyboard.inline_keyboard.push(row);
+        });
+      }
+
+      // Add main menu button (Row 3)
+      keyboard.inline_keyboard.push([mainMenuButton]);
 
       // Send photo with caption and button
       if (salesRule.image) {
