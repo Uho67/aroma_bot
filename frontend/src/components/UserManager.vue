@@ -619,7 +619,7 @@ export default {
       loading: false,
       error: null,
       currentPage: 1,
-      itemsPerPage: 50,
+      itemsPerPage: 100,
       searchQuery: '',
       statusFilter: '',
       subscriptionFilter: '',

@@ -80,7 +80,7 @@ async function initializeBotsOnStartup() {
 app.get('/api/users', async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 50;
+    const limit = parseInt(req.query.limit) || 100;
     const search = req.query.search || '';
     const status = req.query.status || '';
     const dateFrom = req.query.dateFrom;
