@@ -8,22 +8,19 @@ datasource db {
 }
 
 model User {
-  id            Int          @id @default(autoincrement())
-  chat_id       String       @unique
-  user_name     String?
-  first_name    String?
-  last_name    String?
-  is_blocked    Boolean      @default(false)
-  is_in_chat    Boolean      @default(false)
-  is_subscriber Boolean      @default(false)
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
-  
-  // Relations
+  id             Int             @id @default(autoincrement())
+  chat_id        String          @unique
+  user_name      String?
+  first_name     String?
+  last_name      String?
+  is_blocked     Boolean         @default(false)
+  is_in_chat     Boolean         @default(false)
+  is_subscriber  Boolean         @default(false)
+  attention_needed Boolean   @default(false)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
   userSalesRules UserSalesRule[]
 }
-
-
 
 model Post {
   id             Int      @id @default(autoincrement())
@@ -61,16 +58,14 @@ model Admin {
 }
 
 model SalesRule {
-  id          Int          @id @default(autoincrement())
-  name        String
-  description String?
-  image       String?
-  max_uses    Int          @default(1)
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-  
-  // Relations
-  coupons     CouponCode[]
+  id             Int             @id @default(autoincrement())
+  name           String
+  description    String?
+  image          String?
+  max_uses       Int             @default(1)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  coupons        CouponCode[]
   userSalesRules UserSalesRule[]
 }
 
@@ -93,12 +88,9 @@ model UserSalesRule {
   user_id       Int
   sales_rule_id Int
   createdAt     DateTime  @default(now())
-  
-  // Relations
-  user       User       @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  salesRule  SalesRule  @relation(fields: [sales_rule_id], references: [id], onDelete: Cascade)
-  
-  // Unique constraint to prevent duplicate assignments
+  salesRule     SalesRule @relation(fields: [sales_rule_id], references: [id], onDelete: Cascade)
+  user          User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
   @@unique([user_id, sales_rule_id])
 }
 
