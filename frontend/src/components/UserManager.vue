@@ -156,6 +156,16 @@
                        </div>
                        <div class="col-md-2">
                          <label class="form-label small text-muted fw-medium">
+                           <i class="fas fa-exclamation-triangle me-1"></i>Внимание
+                         </label>
+                         <select v-model="attentionFilter" class="form-select">
+                           <option value="">Все</option>
+                           <option value="needs_attention">Требуют внимания</option>
+                           <option value="no_attention">Не требуют внимания</option>
+                         </select>
+                       </div>
+                       <div class="col-md-2">
+                         <label class="form-label small text-muted fw-medium">
                            <i class="fas fa-calendar me-1"></i>Дата с
                          </label>
                          <input 
@@ -221,6 +231,11 @@
                            <i class="fas fa-bell me-1"></i>{{ subscriptionFilter === 'subscribed' ? 'Подписанные' : 'Не подписанные' }}
                            <button @click="subscriptionFilter = ''" class="btn-close btn-close-sm ms-1" style="font-size: 0.6em;"></button>
                          </span>
+                         <span v-if="attentionFilter" class="badge bg-light text-dark border">
+                           <i class="fas fa-exclamation-triangle me-1"></i>
+                           {{ attentionFilter === 'needs_attention' ? 'Требуют внимания' : 'Не требуют внимания' }}
+                           <button @click="attentionFilter = ''" class="btn-close btn-close-sm ms-1" style="font-size: 0.6em;"></button>
+                         </span>
                          <span v-if="dateFrom" class="badge bg-light text-dark border">
                            <i class="fas fa-calendar me-1"></i>С {{ formatDateShort(dateFrom) }}
                            <button @click="dateFrom = ''" class="btn-close btn-close-sm ms-1" style="font-size: 0.6em;"></button>
@@ -273,6 +288,7 @@
                       <th>Chat ID</th>
                       <th>Статус</th>
                       <th>Подписка</th>
+                      <th>Внимание</th>
                       <th>Правила продаж</th>
                       <th>Дата регистрации</th>
                       <th>Последнее обновление</th>
@@ -309,6 +325,14 @@
                       </span>
                       <span v-else class="badge bg-secondary">
                         <i class="fas fa-times-circle me-1"></i>Не подписан
+                      </span>
+                    </td>
+                    <td>
+                      <span v-if="user.attention_needed" class="badge bg-warning text-dark">
+                        <i class="fas fa-exclamation-triangle me-1"></i>Требует внимания
+                      </span>
+                      <span v-else class="badge bg-success">
+                        <i class="fas fa-check-circle me-1"></i>OK
                       </span>
                     </td>
                     <td>
@@ -623,6 +647,7 @@ export default {
       searchQuery: '',
       statusFilter: '',
       subscriptionFilter: '',
+      attentionFilter: '',
       dateFrom: '',
       dateTo: '',
       updatedFrom: '',
@@ -687,6 +712,7 @@ export default {
       return this.searchQuery.trim() || 
              this.statusFilter || 
              this.subscriptionFilter || 
+             this.attentionFilter ||
              this.dateFrom || 
              this.dateTo ||
              this.updatedFrom ||
@@ -697,6 +723,7 @@ export default {
       if (this.searchQuery.trim()) count++;
       if (this.statusFilter) count++;
       if (this.subscriptionFilter) count++;
+      if (this.attentionFilter) count++;
       if (this.dateFrom) count++;
       if (this.dateTo) count++;
       if (this.updatedFrom) count++;
@@ -736,6 +763,10 @@ export default {
         
         if (this.subscriptionFilter) {
           params.subscription = this.subscriptionFilter;
+        }
+        
+        if (this.attentionFilter) {
+          params.attentionFilter = this.attentionFilter;
         }
         
         if (this.dateFrom) {
@@ -790,6 +821,7 @@ export default {
         this.searchQuery = '';
         this.statusFilter = '';
         this.subscriptionFilter = '';
+        this.attentionFilter = '';
         this.dateFrom = '';
         this.dateTo = '';
         this.updatedFrom = '';

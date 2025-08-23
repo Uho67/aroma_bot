@@ -17,6 +17,7 @@ const SalesRuleRouter = require('./sales-rule/sales-rule.router');
 const CouponCodeRouter = require('./coupon-code/coupon-code.router');
 const ConfigurationRouter = require('./configuration/configuration.router');
 const SubscriptionRouter = require('./telegram/subscription.router');
+const { startAttentionCheckCron, runManualCheck, attentionChecker } = require('./cron');
 
 const prisma = new PrismaClient();
 const app = express();
@@ -114,6 +115,14 @@ app.get('/api/users', async (req, res) => {
       where.is_subscriber = true;
     } else if (subscription === 'not_subscribed') {
       where.is_subscriber = false;
+    }
+
+    // Attention needed filter
+    const attentionFilter = req.query.attentionFilter || '';
+    if (attentionFilter === 'needs_attention') {
+      where.attention_needed = true;
+    } else if (attentionFilter === 'no_attention') {
+      where.attention_needed = false;
     }
 
     // Date range filter
@@ -436,12 +445,63 @@ app.put('/api/start-message', async (req, res) => {
   }
 });
 
+// Endpoint для отправки sales rules пользователям
+app.post('/api/sales-rules/:id/send', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { userIds } = req.body;
 
+    if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
+      return res.status(400).json({ error: 'Invalid request data' });
+    }
 
+    // Получаем sales rule
+    const salesRule = await prisma.salesRule.findUnique({
+      where: { id: parseInt(id) }
+    });
+
+    if (!salesRule) {
+      return res.status(404).json({ error: 'Sales rule not found' });
+    }
+
+    // Отправляем sales rule пользователям через sales rule service
+    const response = await salesRuleRouter.sendSalesRule(id, userIds);
+
+    // После успешной отправки sales rule сбрасываем attention_needed для всех пользователей
+    if (response.success) {
+      try {
+        await attentionChecker.resetUserAttentionByChatIds(userIds);
+        console.log(`Reset attention_needed for ${userIds.length} users after sending sales rule`);
+      } catch (resetError) {
+        console.error('Error resetting attention_needed after sales rule:', resetError);
+        // Не блокируем основной ответ из-за ошибки сброса attention_needed
+      }
+    }
+
+    res.json(response);
+  } catch (error) {
+    console.error('Error in sales rule send:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
 
 // Start server and initialize bots
 app.listen(port, async () => {
   console.log(`Server is running on port ${port}`);
   await initializeBotsOnStartup();
+});
+
+// Start cron jobs
+startAttentionCheckCron();
+
+// Добавляем endpoint для ручного запуска проверки (для тестирования)
+app.post('/api/cron/attention-check', async (req, res) => {
+  try {
+    await runManualCheck();
+    res.json({ success: true, message: 'Attention check completed' });
+  } catch (error) {
+    console.error('Error running manual attention check:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
 });
