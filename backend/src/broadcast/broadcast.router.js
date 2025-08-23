@@ -3,6 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const BroadcastService = require('./broadcast.service');
 const ButtonsService = require('../telegram/buttons.services');
+const { attentionChecker } = require('../cron');
 
 class BroadcastRouter {
   constructor(botService) {
@@ -77,6 +78,17 @@ class BroadcastRouter {
           }
         }
 
+        // После успешной отправки поста сбрасываем attention_needed для всех пользователей
+        if (sentCount > 0) {
+          try {
+            await attentionChecker.resetUserAttentionByChatIds(userIds);
+            console.log(`Reset attention_needed for ${userIds.length} users after sending post`);
+          } catch (resetError) {
+            console.error('Error resetting attention_needed after post:', resetError);
+            // Не блокируем основной ответ из-за ошибки сброса attention_needed
+          }
+        }
+
         res.json({
           message: `Post sent to selected users`,
           sentCount: sentCount,
@@ -120,6 +132,7 @@ class BroadcastRouter {
 
         let sentCount = 0;
         const errors = [];
+        const successfulChatIds = []; // Массив для успешно отправленных пользователей
 
         // Send post to each user
         for (const user of users) {
@@ -135,7 +148,7 @@ class BroadcastRouter {
               // Send text message if image doesn't exist
               await bot.sendMessage(user.chat_id, post.description);
             }
-            
+
             // Update user's updatedAt timestamp after successful send
             try {
               await this.broadcastService.prisma.user.update({
@@ -146,14 +159,27 @@ class BroadcastRouter {
               console.error(`Failed to update user timestamp for ${user.chat_id}:`, updateError);
               // Don't fail the post sending if timestamp update fails
             }
-            
+
             sentCount++;
+            successfulChatIds.push(user.chat_id); // Добавляем в список успешных
           } catch (error) {
             console.error(`Error sending to user ${user.chat_id}:`, error);
             errors.push({
               userId: user.chat_id,
               error: error.message
             });
+          }
+        }
+
+        // После успешной отправки поста всем пользователям сбрасываем attention_needed
+        if (successfulChatIds.length > 0) {
+          try {
+            const { attentionChecker } = require('../cron');
+            await attentionChecker.resetUserAttentionByChatIds(successfulChatIds);
+            console.log(`Reset attention_needed for ${successfulChatIds.length} users after mass broadcast`);
+          } catch (resetError) {
+            console.error('Error resetting attention_needed after mass broadcast:', resetError);
+            // Не блокируем основной ответ из-за ошибки сброса attention_needed
           }
         }
 

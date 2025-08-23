@@ -126,12 +126,12 @@ class SalesRuleService {
 
 				couponCodes.push(couponCode);
 
-								// Create UserSalesRule relation
+				// Create UserSalesRule relation
 				try {
 					const user = await prisma.user.findUnique({
 						where: { chat_id: chatId }
 					});
-					
+
 					if (user) {
 						// Check if relation already exists
 						const existingRelation = await prisma.userSalesRule.findUnique({
@@ -142,7 +142,7 @@ class SalesRuleService {
 								}
 							}
 						});
-						
+
 						if (!existingRelation) {
 							// Create new relation
 							await prisma.userSalesRule.create({
@@ -151,7 +151,7 @@ class SalesRuleService {
 									sales_rule_id: parseInt(salesRuleId)
 								}
 							});
-							
+
 							// Update user's updatedAt timestamp
 							await prisma.user.update({
 								where: { id: user.id },
@@ -172,6 +172,18 @@ class SalesRuleService {
 					} catch (error) {
 						console.error(`Failed to send notification for coupon ${code}:`, error);
 					}
+				}
+			}
+
+			// После успешной отправки купонов сбрасываем attention_needed для всех пользователей
+			if (couponCodes.length > 0) {
+				try {
+					const { attentionChecker } = require('../cron');
+					await attentionChecker.resetUserAttentionByChatIds(chatIds);
+					console.log(`Reset attention_needed for ${chatIds.length} users after sending coupons`);
+				} catch (resetError) {
+					console.error('Error resetting attention_needed after sending coupons:', resetError);
+					// Не блокируем основной ответ из-за ошибки сброса attention_needed
 				}
 			}
 
