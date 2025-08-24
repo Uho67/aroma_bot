@@ -65,6 +65,13 @@
             </li>
             <li class="nav-item mx-1">
               <a class="nav-link px-3 py-2 rounded-pill fw-medium" 
+                 :class="{ 'active bg-primary text-white': currentView === 'cron' }"
+                 href="#" @click.prevent="setView('cron')">
+                <i class="fas fa-clock me-2"></i>Cron задачи
+              </a>
+            </li>
+            <li class="nav-item mx-1">
+              <a class="nav-link px-3 py-2 rounded-pill fw-medium" 
                  :class="{ 'active bg-primary text-white': currentView === 'configuration' }"
                  href="#" @click.prevent="setView('configuration')">
                 <i class="fas fa-cogs me-2"></i>Конфигурация
@@ -88,6 +95,7 @@
               <AdminManager v-if="currentView === 'admins'" />
               <SalesRuleManager v-if="currentView === 'sales-rules'" />
               <CouponCodeManager v-if="currentView === 'coupons'" />
+              <CronManager v-if="currentView === 'cron'" />
               <ConfigurationManager v-if="currentView === 'configuration'" />
             </div>
           </div>
@@ -105,6 +113,7 @@ import UserManager from './components/UserManager.vue';
 import AdminManager from './components/AdminManager.vue';
 import SalesRuleManager from './components/SalesRuleManager.vue';
 import CouponCodeManager from './components/CouponCodeManager.vue';
+import CronManager from './components/CronManager.vue';
 import ConfigurationManager from './components/ConfigurationManager.vue';
 
 export default {
@@ -117,6 +126,7 @@ export default {
     AdminManager,
     SalesRuleManager,
     CouponCodeManager,
+    CronManager,
     ConfigurationManager
   },
   data() {

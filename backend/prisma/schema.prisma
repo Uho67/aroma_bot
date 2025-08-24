@@ -19,6 +19,8 @@ model User {
   attention_needed Boolean   @default(false)
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
+  
+  // Relations - только существующие
   userSalesRules UserSalesRule[]
 }
 
@@ -65,6 +67,8 @@ model SalesRule {
   max_uses       Int             @default(1)
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
+  
+  // Relations - только существующие
   coupons        CouponCode[]
   userSalesRules UserSalesRule[]
 }
@@ -90,6 +94,19 @@ model UserSalesRule {
   createdAt     DateTime  @default(now())
   salesRule     SalesRule @relation(fields: [sales_rule_id], references: [id], onDelete: Cascade)
   user          User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, sales_rule_id])
+}
+
+model UserSalesRuleQueue {
+  id            Int       @id @default(autoincrement())
+  user_id       Int
+  sales_rule_id Int
+  createdAt     DateTime  @default(now())
+  
+  // Убираем явные связи - оставляем только логические ссылки
+  // salesRule     SalesRule @relation(fields: [sales_rule_id], references: [id], onDelete: Cascade)
+  // user          User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@unique([user_id, sales_rule_id])
 }

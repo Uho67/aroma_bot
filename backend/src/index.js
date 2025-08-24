@@ -17,7 +17,7 @@ const SalesRuleRouter = require('./sales-rule/sales-rule.router');
 const CouponCodeRouter = require('./coupon-code/coupon-code.router');
 const ConfigurationRouter = require('./configuration/configuration.router');
 const SubscriptionRouter = require('./telegram/subscription.router');
-const { startAttentionCheckCron, runManualCheck, attentionChecker } = require('./cron');
+const { startAttentionCheckCron, startQueueProcessorCron, runManualCheck, runManualQueueProcess } = require('./cron');
 
 const prisma = new PrismaClient();
 const app = express();
@@ -494,14 +494,38 @@ app.listen(port, async () => {
 
 // Start cron jobs
 startAttentionCheckCron();
+startQueueProcessorCron();
 
-// Добавляем endpoint для ручного запуска проверки (для тестирования)
+// Добавляем endpoint для ручного запуска проверки внимания
 app.post('/api/cron/attention-check', async (req, res) => {
   try {
     await runManualCheck();
     res.json({ success: true, message: 'Attention check completed' });
   } catch (error) {
     console.error('Error running manual attention check:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Добавляем endpoint для ручного запуска обработки очереди
+app.post('/api/cron/queue-process', async (req, res) => {
+  try {
+    await runManualQueueProcess();
+    res.json({ success: true, message: 'Queue processing completed' });
+  } catch (error) {
+    console.error('Error running manual queue processing:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Добавляем endpoint для получения статистики очереди
+app.get('/api/cron/queue-stats', async (req, res) => {
+  try {
+    const { queueProcessor } = require('./cron');
+    const stats = await queueProcessor.getQueueStats();
+    res.json({ success: true, stats });
+  } catch (error) {
+    console.error('Error getting queue stats:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
