@@ -15,7 +15,7 @@
       <div class="col-md-4">
         <div class="card text-center">
           <div class="card-body">
-            <h5 class="card-title">Записей в очереди</h5>
+            <h5 class="card-title">Записей в очереди купонов</h5>
             <h3 class="text-primary">{{ queueStats.totalItems || 0 }}</h3>
           </div>
         </div>
@@ -23,7 +23,7 @@
       <div class="col-md-4">
         <div class="card text-center">
           <div class="card-body">
-            <h5 class="card-title">Самая старая запись</h5>
+            <h5 class="card-title">Самая старая запись купонов</h5>
             <h6 class="text-warning">{{ formatDate(queueStats.oldestItem) || 'Нет данных' }}</h6>
           </div>
         </div>
@@ -31,8 +31,36 @@
       <div class="col-md-4">
         <div class="card text-center">
           <div class="card-body">
-            <h5 class="card-title">Самая новая запись</h5>
+            <h5 class="card-title">Самая новая запись купонов</h5>
             <h6 class="text-success">{{ formatDate(queueStats.newestItem) || 'Нет данных' }}</h6>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Статистика очереди постов -->
+    <div class="row mb-4" v-if="postQueueStats">
+      <div class="col-md-4">
+        <div class="card text-center">
+          <div class="card-body">
+            <h5 class="card-title">Записей в очереди постов</h5>
+            <h3 class="text-success">{{ postQueueStats.totalItems || 0 }}</h3>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card text-center">
+          <div class="card-body">
+            <h5 class="card-title">Самая старая запись постов</h5>
+            <h6 class="text-warning">{{ formatDate(postQueueStats.oldestItem) || 'Нет данных' }}</h6>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card text-center">
+          <div class="card-body">
+            <h5 class="card-title">Самая новая запись постов</h5>
+            <h6 class="text-success">{{ formatDate(postQueueStats.newestItem) || 'Нет данных' }}</h6>
           </div>
         </div>
       </div>
@@ -90,6 +118,49 @@
                 </div>
               </div>
 
+              <!-- Обработка очереди постов -->
+              <div class="col-md-6">
+                <div class="card border-success">
+                  <div class="card-header bg-success text-white">
+                    <h6 class="mb-0">
+                      <i class="fas fa-image me-2"></i>
+                      Очередь постов
+                    </h6>
+                  </div>
+                  <div class="card-body">
+                    <p class="card-text">
+                      <strong>Что делает:</strong> Обрабатывает очередь пользователей, ожидающих получения постов.
+                      <br><strong>Автоматически:</strong> Каждые 5 минут
+                      <br><strong>Обрабатывает:</strong> До 100 записей за раз
+                    </p>
+                    <div class="d-flex gap-2">
+                      <button 
+                        @click="runPostQueueProcess" 
+                        class="btn btn-success" 
+                        :disabled="postQueueProcessing">
+                        <span v-if="postQueueProcessing" class="spinner-border spinner-border-sm me-2"></span>
+                        <i v-else class="fas fa-play me-2"></i>
+                        {{ postQueueProcessing ? 'Обрабатываю...' : 'Обработать очередь постов' }}
+                      </button>
+                      <button 
+                        @click="getPostQueueStats" 
+                        class="btn btn-outline-secondary">
+                        <i class="fas fa-chart-bar me-2"></i>
+                        Статистика
+                      </button>
+                    </div>
+                    <div v-if="postQueueProcessResult" class="mt-3">
+                      <div class="alert alert-success">
+                        <h6>Результат обработки:</h6>
+                        <p class="mb-1"><strong>Обработано записей:</strong> {{ postQueueProcessResult.processedCount || 0 }}</p>
+                        <p class="mb-1"><strong>Ошибок:</strong> {{ postQueueProcessResult.errors?.length || 0 }}</p>
+                        <p class="mb-0"><strong>Время выполнения:</strong> {{ postQueueProcessResult.executionTime }}ms</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <!-- Проверка пользователей требующих внимания -->
               <div class="col-md-6">
                 <div class="card border-warning">
@@ -120,7 +191,7 @@
                         <h6>Результат проверки:</h6>
                         <p class="mb-0">{{ attentionCheckResult.message }}</p>
                       </div>
-                    </div>
+                      </div>
                   </div>
                 </div>
               </div>
@@ -158,15 +229,19 @@ export default {
     return {
       loading: false,
       queueProcessing: false,
+      postQueueProcessing: false,
       attentionChecking: false,
       queueStats: null,
+      postQueueStats: null,
       queueProcessResult: null,
+      postQueueProcessResult: null,
       attentionCheckResult: null,
       executionLogs: []
     };
   },
   async created() {
     await this.getQueueStats();
+    await this.getPostQueueStats(); // Добавляем загрузку статистики постов
   },
   methods: {
     async getQueueStats() {
@@ -175,11 +250,11 @@ export default {
         const response = await axios.get(`${API_URL}/api/cron/queue-stats`);
         if (response.data.success) {
           this.queueStats = response.data.stats;
-          this.addLog('info', 'Статистика очереди обновлена');
+          this.addLog('info', 'Статистика очереди купонов обновлена');
         }
       } catch (error) {
         console.error('Error getting queue stats:', error);
-        this.addLog('error', 'Ошибка получения статистики очереди');
+        this.addLog('error', 'Ошибка получения статистики очереди купонов');
       } finally {
         this.loading = false;
       }
@@ -209,6 +284,43 @@ export default {
       }
     },
 
+    async runPostQueueProcess() {
+      this.postQueueProcessing = true;
+      this.postQueueProcessResult = null;
+      const startTime = Date.now();
+
+      try {
+        const response = await axios.post(`${API_URL}/api/cron/post-queue-process`);
+        if (response.data.success) {
+          this.postQueueProcessResult = {
+            processedCount: response.data.processedCount || 0,
+            errors: response.data.errors || [],
+            executionTime: Date.now() - startTime
+          };
+          this.addLog('success', 'Обработка очереди постов завершена успешно');
+          await this.getPostQueueStats();
+        }
+      } catch (error) {
+        console.error('Error running post queue process:', error);
+        this.addLog('error', 'Ошибка при обработке очереди постов: ' + error.message);
+      } finally {
+        this.postQueueProcessing = false;
+      }
+    },
+
+    async getPostQueueStats() {
+      try {
+        const response = await axios.get(`${API_URL}/api/cron/post-queue-stats`);
+        if (response.data.success) {
+          this.postQueueStats = response.data.stats;
+          this.addLog('info', 'Статистика очереди постов обновлена');
+        }
+      } catch (error) {
+        console.error('Error getting post queue stats:', error);
+        this.addLog('error', 'Ошибка получения статистики очереди постов');
+      }
+    },
+
     async runAttentionCheck() {
       this.attentionChecking = true;
       this.attentionCheckResult = null;
@@ -231,6 +343,7 @@ export default {
 
     async refreshStats() {
       await this.getQueueStats();
+      await this.getPostQueueStats(); // Обновляем обе статистики
     },
 
     addLog(type, message) {

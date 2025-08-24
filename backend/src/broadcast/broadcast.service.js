@@ -1,10 +1,12 @@
 const { PrismaClient } = require('@prisma/client');
 const path = require('path');
 const fs = require('fs');
+const ButtonsService = require('../telegram/buttons.services');
 
 class BroadcastService {
   constructor() {
     this.prisma = new PrismaClient();
+    this.buttonsService = new ButtonsService();
   }
 
   /**
@@ -32,12 +34,141 @@ class BroadcastService {
    */
   async getPostById(postId) {
     try {
+      const numericPostId = parseInt(postId);
+      if (isNaN(numericPostId)) {
+        throw new Error('Invalid post ID: ' + postId);
+      }
+
       const post = await this.prisma.post.findUnique({
-        where: { id: parseInt(postId) }
+        where: { id: numericPostId }
       });
+
       return post;
     } catch (error) {
       console.error('Error getting post by ID:', error);
+      throw error;
+    }
+  }
+
+  async sendPostToUser(post, chatId) {
+    try {
+      const bot = this.getBotService().bot;
+      const imagePath = path.join(__dirname, '..', post.image);
+      const keyboard = await this.buttonsService.getWelcomeMenuButtons();
+
+      if (post.image && fs.existsSync(imagePath)) {
+        await bot.sendPhoto(chatId, imagePath, {
+          caption: post.description,
+          reply_markup: keyboard
+        });
+      } else {
+        // Send text message if no image or image doesn't exist
+        await bot.sendMessage(chatId, post.description, {
+          reply_markup: keyboard
+        });
+      }
+
+      // Update user's updatedAt timestamp after successful send
+      try {
+        await this.prisma.user.update({
+          where: { chat_id: chatId },
+          data: { updatedAt: new Date() }
+        });
+      } catch (updateError) {
+        console.error(`Failed to update user timestamp for ${chatId}:`, updateError);
+        // Don't fail the post sending if timestamp update fails
+      }
+
+      return { success: true, chatId };
+    } catch (error) {
+      console.error(`Error sending post to user ${chatId}:`, error);
+      return { success: false, chatId, error: error.message };
+    }
+  }
+
+  async sendPostToUsers(post, chatIds) {
+    const results = [];
+    let sentCount = 0;
+    const errors = [];
+
+    for (const chatId of chatIds) {
+      const result = await this.sendPostToUser(post, chatId, this.buttonsService, this.getBotService().bot);
+      results.push(result);
+
+      if (result.success) {
+        sentCount++;
+      } else {
+        errors.push({
+          userId: result.chatId,
+          error: result.error
+        });
+      }
+    }
+
+    return {
+      sentCount,
+      errors,
+      results
+    };
+  }
+
+  async addPostToQueue(postId, userIds) {
+    try {
+      console.log(`Adding ${userIds.length} users to post queue for post ${postId}`);
+
+      let addedCount = 0;
+      const errors = [];
+
+      for (const userId of userIds) {
+        try {
+          // Проверяем существование пользователя
+          const user = await this.prisma.user.findUnique({
+            where: { chat_id: userId.toString() }
+          });
+
+          if (!user) {
+            console.log(`User with chat_id ${userId} not found, skipping...`);
+            continue;
+          }
+
+          // Проверяем, не в очереди ли уже
+          const existingQueueItem = await this.prisma.postQueue.findFirst({
+            where: {
+              user_id: user.id,
+              post_id: parseInt(postId)
+            }
+          });
+
+          if (existingQueueItem) {
+            console.log(`User ${userId} already in post queue for post ${postId}, skipping...`);
+            continue;
+          }
+
+          // Добавляем в очередь постов
+          await this.prisma.postQueue.create({
+            data: {
+              user_id: user.id,
+              post_id: parseInt(postId)
+            }
+          });
+
+          addedCount++;
+          console.log(`Successfully added user ${userId} to post queue`);
+
+        } catch (error) {
+          console.error(`Error adding user ${userId} to post queue:`, error);
+          errors.push({ userId, error: error.message });
+        }
+      }
+
+      return {
+        success: true,
+        addedCount,
+        errors
+      };
+
+    } catch (error) {
+      console.error('Error in addPostToQueue:', error);
       throw error;
     }
   }
@@ -47,6 +178,17 @@ class BroadcastService {
    */
   async disconnect() {
     await this.prisma.$disconnect();
+  }
+
+  getBotService() {
+    // Get the bot service from the global instance
+    try {
+      const BotService = require('../telegram/bot.service');
+      return BotService.getInstance();
+    } catch (error) {
+      console.error('Failed to get bot service instance:', error);
+      return null;
+    }
   }
 }
 
