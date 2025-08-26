@@ -9,11 +9,21 @@ class CouponCodeRouter {
 	}
 
 	setupRoutes() {
-		// Get all coupon codes
+		// Get all coupon codes with optional filters
 		this.router.get('/coupon-codes', async (req, res) => {
 			try {
-				const couponCodes = await this.couponCodeService.getAllCouponCodes();
-				res.json(couponCodes);
+				const { usageStatus, dateFrom, dateTo } = req.query;
+				
+				// If filters are provided, use the filtered method
+				if (usageStatus || dateFrom || dateTo) {
+					const filters = { usageStatus, dateFrom, dateTo };
+					const couponCodes = await this.couponCodeService.getAllCouponCodesWithFilters(filters);
+					res.json(couponCodes);
+				} else {
+					// Otherwise use the original method
+					const couponCodes = await this.couponCodeService.getAllCouponCodes();
+					res.json(couponCodes);
+				}
 			} catch (error) {
 				res.status(500).json({ error: error.message });
 			}
