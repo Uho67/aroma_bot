@@ -17,7 +17,7 @@ const SalesRuleRouter = require('./sales-rule/sales-rule.router');
 const CouponCodeRouter = require('./coupon-code/coupon-code.router');
 const ConfigurationRouter = require('./configuration/configuration.router');
 const SubscriptionRouter = require('./telegram/subscription.router');
-const { startAttentionCheckCron, runManualCheck, attentionChecker } = require('./cron');
+const { startAllCrons, attentionChecker, queueProcessor, postQueueProcessor } = require('./cron');
 
 const prisma = new PrismaClient();
 const app = express();
@@ -489,19 +489,60 @@ app.post('/api/sales-rules/:id/send', async (req, res) => {
 // Start server and initialize bots
 app.listen(port, async () => {
   console.log(`Server is running on port ${port}`);
+
+  // Start cron jobs
+  startAllCrons();
+
   await initializeBotsOnStartup();
 });
 
-// Start cron jobs
-startAttentionCheckCron();
+// Cron endpoints
+app.post('/api/cron/queue-process', async (req, res) => {
+  try {
+    const result = await queueProcessor.processQueue();
+    res.json({ success: true, result });
+  } catch (error) {
+    console.error('Error running queue process:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
 
-// Добавляем endpoint для ручного запуска проверки (для тестирования)
+app.post('/api/cron/post-queue-process', async (req, res) => {
+  try {
+    const result = await postQueueProcessor.processPostQueue();
+    res.json({ success: true, result });
+  } catch (error) {
+    console.error('Error running post queue process:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.post('/api/cron/attention-check', async (req, res) => {
   try {
-    await runManualCheck();
-    res.json({ success: true, message: 'Attention check completed' });
+    const result = await attentionChecker.checkUsersAttention();
+    res.json({ success: true, result });
   } catch (error) {
-    console.error('Error running manual attention check:', error);
-    res.status(500).json({ success: false, error: error.message });
+    console.error('Error running attention check:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/cron/queue-stats', async (req, res) => {
+  try {
+    const stats = await queueProcessor.getQueueStats();
+    res.json({ success: true, stats });
+  } catch (error) {
+    console.error('Error getting queue stats:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/cron/post-queue-stats', async (req, res) => {
+  try {
+    const stats = await postQueueProcessor.getQueueStats();
+    res.json({ success: true, stats });
+  } catch (error) {
+    console.error('Error getting post queue stats:', error);
+    res.status(500).json({ error: error.message });
   }
 });
