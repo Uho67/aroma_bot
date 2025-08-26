@@ -67,17 +67,11 @@ class BroadcastService {
           reply_markup: keyboard
         });
       }
-
-      // Update user's updatedAt timestamp after successful send
-      try {
-        await this.prisma.user.update({
-          where: { chat_id: chatId },
-          data: { updatedAt: new Date() }
-        });
-      } catch (updateError) {
-        console.error(`Failed to update user timestamp for ${chatId}:`, updateError);
-        // Don't fail the post sending if timestamp update fails
-      }
+      await this.prisma.user.update({
+        where: { chat_id: chatId },
+        data: { updatedAt: new Date() }
+      });
+     
 
       return { success: true, chatId };
     } catch (error) {
@@ -113,9 +107,6 @@ class BroadcastService {
   }
 
   async addPostToQueue(postId, userIds) {
-    try {
-      console.log(`Adding ${userIds.length} users to post queue for post ${postId}`);
-
       let addedCount = 0;
       const errors = [];
 
@@ -125,26 +116,16 @@ class BroadcastService {
           const user = await this.prisma.user.findUnique({
             where: { chat_id: userId.toString() }
           });
-
-          if (!user) {
-            console.log(`User with chat_id ${userId} not found, skipping...`);
-            continue;
-          }
-
-          // Проверяем, не в очереди ли уже
           const existingQueueItem = await this.prisma.postQueue.findFirst({
             where: {
               user_id: user.id,
               post_id: parseInt(postId)
             }
           });
-
           if (existingQueueItem) {
             console.log(`User ${userId} already in post queue for post ${postId}, skipping...`);
             continue;
           }
-
-          // Добавляем в очередь постов
           await this.prisma.postQueue.create({
             data: {
               user_id: user.id,
@@ -166,11 +147,6 @@ class BroadcastService {
         addedCount,
         errors
       };
-
-    } catch (error) {
-      console.error('Error in addPostToQueue:', error);
-      throw error;
-    }
   }
 
   /**
