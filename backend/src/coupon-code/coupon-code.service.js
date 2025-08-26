@@ -22,6 +22,47 @@ class CouponCodeService {
 		}
 	}
 
+	async getAllCouponCodesWithFilters(filters = {}) {
+		try {
+			const where = {};
+			
+			// Filter by usage status
+			if (filters.usageStatus === 'used') {
+				where.uses_count = { gt: 0 };
+			} else if (filters.usageStatus === 'unused') {
+				where.uses_count = 0;
+			}
+			
+			// Filter by creation date range
+			if (filters.dateFrom || filters.dateTo) {
+				where.createdAt = {};
+				if (filters.dateFrom) {
+					where.createdAt.gte = new Date(filters.dateFrom);
+				}
+				if (filters.dateTo) {
+					where.createdAt.lte = new Date(filters.dateTo + 'T23:59:59.999Z');
+				}
+			}
+
+			const couponCodes = await prisma.couponCode.findMany({
+				where,
+				include: {
+					sales_rule: {
+						select: {
+							id: true,
+							name: true,
+							description: true
+						}
+					}
+				},
+				orderBy: { createdAt: 'desc' }
+			});
+			return couponCodes;
+		} catch (error) {
+			throw new Error(`Failed to get coupon codes with filters: ${error.message}`);
+		}
+	}
+
 	async getCouponCodeById(id) {
 		try {
 			const couponCode = await prisma.couponCode.findUnique({

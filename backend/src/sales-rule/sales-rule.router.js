@@ -62,20 +62,20 @@ class SalesRuleRouter {
 			}
 		});
 
-		// Send sales rule to users
+		// Send sales rule to users (теперь добавляет в очередь)
 		this.router.post('/sales-rules/:id/send', async (req, res) => {
 			try {
 				const { userIds } = req.body;
 				if (!userIds || !Array.isArray(userIds)) {
-					return res.status(400).json({ error: 'Chat IDs array is required' });
+					return res.status(400).json({ error: 'User IDs array is required' });
 				}
 
-				const couponCodes = await this.salesRuleService.sendToUsers(req.params.id, userIds);
+				// Вместо отправки купонов сразу, добавляем в очередь
+				const result = await this.salesRuleService.addToQueue(req.params.id, userIds);
 				res.json({
 					success: true,
-					message: `Sales rule sent to ${userIds.length} users successfully`,
-					couponCodes,
-					couponCodesCount: couponCodes.length
+					message: `Added ${result.length} users to queue for sales rule`,
+					queuedCount: result.length
 				});
 			} catch (error) {
 				res.status(400).json({ error: error.message });

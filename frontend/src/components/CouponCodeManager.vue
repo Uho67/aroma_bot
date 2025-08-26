@@ -11,7 +11,8 @@
     <div class="card shadow-sm mb-3 search-bar">
       <div class="card-body">
         <div class="row align-items-center">
-          <div class="col-md-6">
+          <div class="col-lg-3 col-md-4 col-sm-6 mb-2">
+            <label class="form-label small text-muted mb-1">Поиск по коду</label>
             <div class="input-group">
               <span class="input-group-text">
                 <i class="fas fa-search"></i>
@@ -33,7 +34,42 @@
               </button>
             </div>
           </div>
-          <div class="col-md-6 text-end">
+          <div class="col-lg-2 col-md-3 col-sm-6 mb-2">
+            <label class="form-label small text-muted mb-1">Статус использования</label>
+            <select v-model="usageFilter" class="form-select" @change="applyFilters">
+              <option value="">Все купоны</option>
+              <option value="used">Использованные</option>
+              <option value="unused">Неиспользованные</option>
+            </select>
+          </div>
+          <div class="col-lg-2 col-md-3 col-sm-6 mb-2">
+            <label class="form-label small text-muted mb-1">Дата от</label>
+            <input 
+              type="date" 
+              class="form-control" 
+              v-model="dateFrom" 
+              placeholder="Дата от"
+              @change="applyFilters"
+            >
+          </div>
+          <div class="col-lg-2 col-md-3 col-sm-6 mb-2">
+            <label class="form-label small text-muted mb-1">Дата до</label>
+            <input 
+              type="date" 
+              class="form-control" 
+              v-model="dateTo" 
+              placeholder="Дата до"
+              @change="applyFilters"
+            >
+          </div>
+          <div class="col-lg-3 col-md-3 col-sm-6 mb-2 text-end">
+            <button @click="clearAllFilters" class="btn btn-outline-secondary btn-sm">
+              <i class="fas fa-times"></i> Очистить
+            </button>
+          </div>
+        </div>
+        <div class="row mt-2">
+          <div class="col-12 text-end">
             <span class="text-muted">
               Найдено: {{ filteredCouponCodes.length }} из {{ couponCodes.length }}
             </span>
@@ -205,19 +241,43 @@ export default {
   data() {
     return {
       couponCodes: [],
-      searchQuery: ''
+      searchQuery: '',
+      usageFilter: '', // 'used' or 'unused'
+      dateFrom: '',
+      dateTo: '',
     };
   },
   computed: {
     filteredCouponCodes() {
-      if (!this.searchQuery.trim()) {
-        return this.couponCodes;
+      let filtered = this.couponCodes;
+
+      if (this.searchQuery.trim()) {
+        const query = this.searchQuery.toLowerCase().trim();
+        filtered = filtered.filter(coupon => 
+          coupon.code.toLowerCase().includes(query)
+        );
       }
-      
-      const query = this.searchQuery.toLowerCase().trim();
-      return this.couponCodes.filter(coupon => 
-        coupon.code.toLowerCase().includes(query)
-      );
+
+      if (this.usageFilter) {
+        filtered = filtered.filter(coupon => {
+          if (this.usageFilter === 'used') {
+            return coupon.uses_count > 0;
+          } else if (this.usageFilter === 'unused') {
+            return coupon.uses_count === 0;
+          }
+          return true;
+        });
+      }
+
+      if (this.dateFrom) {
+        filtered = filtered.filter(coupon => new Date(coupon.createdAt) >= new Date(this.dateFrom));
+      }
+
+      if (this.dateTo) {
+        filtered = filtered.filter(coupon => new Date(coupon.createdAt) <= new Date(this.dateTo));
+      }
+
+      return filtered;
     },
     sentCouponsCount() {
       return this.couponCodes.filter(coupon => coupon.is_sent).length;
@@ -242,6 +302,28 @@ export default {
         this.couponCodes = await response.json();
       } catch (error) {
         console.error('Error loading coupon codes:', error);
+      }
+    },
+    async loadFilteredCouponCodes() {
+      try {
+        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3008';
+        const params = new URLSearchParams();
+        
+        if (this.usageFilter) {
+          params.append('usageStatus', this.usageFilter);
+        }
+        if (this.dateFrom) {
+          params.append('dateFrom', this.dateFrom);
+        }
+        if (this.dateTo) {
+          params.append('dateTo', this.dateTo);
+        }
+        
+        const url = `${API_URL}/api/coupon-codes${params.toString() ? '?' + params.toString() : ''}`;
+        const response = await fetch(url);
+        this.couponCodes = await response.json();
+      } catch (error) {
+        console.error('Error loading filtered coupon codes:', error);
       }
     },
     async markAsSent(id) {
@@ -300,6 +382,18 @@ export default {
     },
     clearSearch() {
       this.searchQuery = '';
+    },
+    applyFilters() {
+      // Load filtered data from backend
+      this.loadFilteredCouponCodes();
+    },
+    clearAllFilters() {
+      this.searchQuery = '';
+      this.usageFilter = '';
+      this.dateFrom = '';
+      this.dateTo = '';
+      // Reload all data when clearing filters
+      this.loadCouponCodes();
     }
   }
 };
@@ -333,6 +427,24 @@ export default {
 }
 
 .search-bar .form-control:focus {
+  box-shadow: none;
+  border-color: #dee2e6;
+}
+
+.search-bar .form-select {
+  border: 1px solid #dee2e6;
+}
+
+.search-bar .form-select:focus {
+  box-shadow: none;
+  border-color: #dee2e6;
+}
+
+.search-bar input[type="date"] {
+  border: 1px solid #dee2e6;
+}
+
+.search-bar input[type="date"]:focus {
   box-shadow: none;
   border-color: #dee2e6;
 }

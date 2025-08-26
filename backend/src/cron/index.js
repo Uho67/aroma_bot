@@ -1,7 +1,11 @@
 const cron = require('node-cron');
 const AttentionCheckerService = require('./attention-checker.service');
+const QueueProcessorService = require('./queue-processor.service');
+const PostQueueProcessorService = require('./post-queue-processor.service');
 
 const attentionChecker = new AttentionCheckerService();
+const queueProcessor = new QueueProcessorService();
+const postQueueProcessor = new PostQueueProcessorService();
 
 // Запускаем проверку каждый день в 9:00 утра
 const startAttentionCheckCron = () => {
@@ -10,20 +14,49 @@ const startAttentionCheckCron = () => {
     await attentionChecker.checkUsersAttention();
   }, {
     scheduled: true,
-    timezone: "Europe/Moscow" // или другая подходящая временная зона
+    timezone: 'Europe/Moscow'
   });
-
   console.log('Attention check cron job scheduled for daily at 9:00 AM');
 };
 
-// Метод для ручного запуска (для тестирования)
-const runManualCheck = async () => {
-  console.log('Manual attention check requested...');
-  await attentionChecker.manualCheck();
+// Запускаем обработку очереди купонов каждые 5 минут
+const startQueueProcessorCron = () => {
+  cron.schedule('*/5 * * * *', async () => {
+    console.log('Running queue processor...');
+    await queueProcessor.processQueue();
+  }, {
+    scheduled: true,
+    timezone: 'Europe/Moscow'
+  });
+  console.log('Queue processor cron job scheduled for every 5 minutes');
+};
+
+// Запускаем обработку очереди постов каждые 5 минут
+const startPostQueueProcessorCron = () => {
+  cron.schedule('*/5 * * * *', async () => {
+    console.log('Running post queue processor...');
+    await postQueueProcessor.processPostQueue();
+  }, {
+    scheduled: true,
+    timezone: 'Europe/Moscow'
+  });
+  console.log('Post queue processor cron job scheduled for every 5 minutes');
+};
+
+// Запускаем все cron jobs
+const startAllCrons = () => {
+  startAttentionCheckCron();
+  startQueueProcessorCron();
+  startPostQueueProcessorCron();
 };
 
 module.exports = {
+  startAllCrons,
+  attentionChecker,
+  queueProcessor,
+  postQueueProcessor,
+  // Экспортируем отдельные функции
   startAttentionCheckCron,
-  runManualCheck,
-  attentionChecker  // Добавляем экспорт attentionChecker
+  startQueueProcessorCron,
+  startPostQueueProcessorCron
 };
