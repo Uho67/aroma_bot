@@ -1,9 +1,11 @@
 const { PrismaClient } = require('@prisma/client');
 const BroadcastService = require('../broadcast/broadcast.service');
 const { bot } = require('../telegram/bot.service');
+const AttentionCheckerService = require('./attention-checker.service');
 
 const prisma = new PrismaClient();
 const broadcastService = new BroadcastService();
+const attentionChecker = new AttentionCheckerService();
 
 class PostQueueProcessorService {
   constructor() {
@@ -89,6 +91,23 @@ class PostQueueProcessorService {
 
           if (sendResults.errors.length > 0) {
             console.log(`⚠️ Errors sending post ${postId}:`, sendResults.errors);
+          }
+
+          // Reset attention_needed for users who successfully received the post
+          if (sendResults.sentCount > 0) {
+            try {
+              const successfulChatIds = sendResults.results
+                .filter(r => r.success)
+                .map(r => r.chatId);
+
+              if (successfulChatIds.length > 0) {
+                await attentionChecker.resetUserAttentionByChatIds(successfulChatIds);
+                console.log(`✅ Reset attention_needed for ${successfulChatIds.length} users after sending post ${postId}`);
+              }
+            } catch (resetError) {
+              console.error('❌ Error resetting attention_needed after post sending:', resetError);
+              // Don't block the main process due to attention reset error
+            }
           }
 
           // Удаляем обработанные записи из очереди

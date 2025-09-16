@@ -63,7 +63,8 @@
             Category: {{ post.link_to_button }}
           </p>
           <div class="post-actions">
-            <button @click="broadcastPost(post.id)" class="broadcast-btn">Отправить всем</button>
+            <button @click="broadcastPost(post.id)" class="broadcast-btn">Добавить в очередь</button>
+            <button @click="broadcastToAttentionNeeded(post.id)" class="attention-btn">Отправить нуждающимся</button>
             <button @click="deletePost(post.id)" class="delete-btn">Delete</button>
           </div>
         </div>
@@ -145,15 +146,28 @@ export default {
       }
     },
     async broadcastPost(id) {
-      if (!confirm('Этот пост будет отправлен ВСЕМ подписчикам бота. Продолжить?')) return
+      if (!confirm('Этот пост будет добавлен в очередь для отправки ВСЕМ подписчикам бота. Продолжить?')) return
 
       try {
         const response = await axios.post(`${API_URL}/api/broadcast/${id}`)
         const result = response.data
-        alert(`Пост успешно отправлен! Отправлено: ${result.sentCount} из ${result.totalUsers} пользователей`)
+        alert(`Пост успешно добавлен в очередь! Добавлено: ${result.addedCount} из ${result.totalUsers} пользователей`)
       } catch (error) {
-        console.error('Error broadcasting post:', error)
-        const errorMessage = error.response?.data?.error || 'Ошибка при отправке поста'
+        console.error('Error adding post to queue:', error)
+        const errorMessage = error.response?.data?.error || 'Ошибка при добавлении поста в очередь'
+        alert(errorMessage)
+      }
+    },
+    async broadcastToAttentionNeeded(id) {
+      if (!confirm('Этот пост будет добавлен в очередь для отправки только пользователям, которым нужно внимание. Продолжить?')) return
+
+      try {
+        const response = await axios.post(`${API_URL}/api/broadcast/${id}/attention`)
+        const result = response.data
+        alert(`Пост успешно добавлен в очередь для нуждающихся! Добавлено: ${result.addedCount} из ${result.totalUsers} пользователей`)
+      } catch (error) {
+        console.error('Error adding post to attention_needed users queue:', error)
+        const errorMessage = error.response?.data?.error || 'Ошибка при добавлении поста в очередь для нуждающихся'
         alert(errorMessage)
       }
     },
@@ -303,6 +317,11 @@ button:disabled {
 
 .broadcast-btn {
   background: #2196F3;
+  flex: 1;
+}
+
+.attention-btn {
+  background: #ff9800;
   flex: 1;
 }
 

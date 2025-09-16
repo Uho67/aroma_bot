@@ -39,6 +39,14 @@
               <i v-else class="fas fa-bell"></i>
               {{ checkingSubscriptions ? 'Проверка...' : `Проверить подписку (${selectedUsers.length})` }}
             </button>
+            
+            <!-- Mass Delete Button -->
+            <div class="vr mx-2"></div>
+            <button @click="massDeleteUsers" class="btn btn-danger" :disabled="selectedUsers.length === 0 || deletingUsers">
+              <span v-if="deletingUsers" class="spinner-border spinner-border-sm me-1"></span>
+              <i v-else class="fas fa-trash"></i>
+              {{ deletingUsers ? 'Удаление...' : `Удалить выбранных (${selectedUsers.length})` }}
+            </button>
           </div>
           <button @click="loadUsers" class="btn btn-outline-primary" :disabled="loading">
             <i class="fas fa-sync-alt" :class="{ 'fa-spin': loading }"></i>
@@ -368,27 +376,33 @@
                       </span>
                     </td>
                     <td>
-                      <div class="btn-group btn-group-sm">
-                        <button 
-                          v-if="!user.is_blocked" 
-                          @click="blockUser(user.chat_id)" 
-                          class="btn btn-outline-danger"
-                          title="Заблокировать">
-                          <i class="fas fa-ban"></i>
+                      <div class="dropdown">
+                        <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                          <i class="fas fa-cog"></i>
                         </button>
-                        <button 
-                          v-else 
-                          @click="unblockUser(user.chat_id)" 
-                          class="btn btn-outline-success"
-                          title="Разблокировать">
-                          <i class="fas fa-check"></i>
-                        </button>
-                        <button 
-                          @click="checkSingleSubscription(user.chat_id)" 
-                          class="btn btn-outline-info"
-                          title="Проверить подписку">
-                          <i class="fas fa-bell"></i>
-                        </button>
+                        <ul class="dropdown-menu">
+                          <li v-if="!user.is_blocked">
+                            <a class="dropdown-item" href="#" @click.prevent="blockUser(user.chat_id)">
+                              <i class="fas fa-ban text-danger me-2"></i>Заблокировать
+                            </a>
+                          </li>
+                          <li v-else>
+                            <a class="dropdown-item" href="#" @click.prevent="unblockUser(user.chat_id)">
+                              <i class="fas fa-check text-success me-2"></i>Разблокировать
+                            </a>
+                          </li>
+                          <li>
+                            <a class="dropdown-item" href="#" @click.prevent="checkSingleSubscription(user.chat_id)">
+                              <i class="fas fa-bell text-info me-2"></i>Проверить подписку
+                            </a>
+                          </li>
+                          <li><hr class="dropdown-divider"></li>
+                          <li>
+                            <a class="dropdown-item text-danger" href="#" @click.prevent="deleteUser(user.chat_id, user.first_name, user.last_name)">
+                              <i class="fas fa-trash me-2"></i>Удалить пользователя
+                            </a>
+                          </li>
+                        </ul>
                       </div>
                     </td>
                   </tr>
@@ -669,7 +683,8 @@ export default {
       checkingSubscriptions: false,
       subscriptionResults: null,
       editingSalesRules: null,
-      salesRulesModal: false
+      salesRulesModal: false,
+      deletingUsers: false
     };
   },
   async created() {
@@ -811,6 +826,71 @@ export default {
       } catch (error) {
         this.error = 'Ошибка при разблокировке пользователя';
         console.error('Error unblocking user:', error);
+      }
+    },
+    async deleteUser(chatId, firstName, lastName) {
+      const userName = `${firstName || ''} ${lastName || ''}`.trim() || `Chat ID: ${chatId}`;
+      
+      if (!confirm(`Вы уверены, что хотите удалить пользователя "${userName}"?\n\nЭто действие нельзя отменить. Будут удалены:\n- Профиль пользователя\n- Все купоны\n- Все сообщения\n- Записи из очередей`)) {
+        return;
+      }
+
+      try {
+        await axios.delete(`${API_URL}/api/users/${chatId}`);
+        
+        // Remove user from selected users if they were selected
+        this.selectedUsers = this.selectedUsers.filter(id => id !== chatId);
+        
+        // Reload users to update the list
+        await this.loadUsers();
+        
+        alert(`Пользователь "${userName}" успешно удален.`);
+      } catch (error) {
+        console.error('Error deleting user:', error);
+        const errorMessage = error.response?.data?.error || 'Ошибка при удалении пользователя';
+        alert(`Ошибка: ${errorMessage}`);
+      }
+    },
+    async massDeleteUsers() {
+      if (this.selectedUsers.length === 0) {
+        alert('Пожалуйста, выберите пользователей для удаления.');
+        return;
+      }
+
+      const userCount = this.selectedUsers.length;
+      const userNames = this.users
+        .filter(user => this.selectedUsers.includes(user.chat_id))
+        .map(user => `${user.first_name || ''} ${user.last_name || ''}`.trim() || `Chat ID: ${user.chat_id}`)
+        .slice(0, 5); // Show only first 5 names
+
+      const namesText = userNames.length > 5 
+        ? userNames.join(', ') + ` и еще ${userCount - 5} пользователей`
+        : userNames.join(', ');
+
+      if (!confirm(`Вы уверены, что хотите удалить ${userCount} пользователей?\n\nПользователи для удаления:\n${namesText}\n\nЭто действие нельзя отменить. Будут удалены:\n- Профили пользователей\n- Все купоны\n- Все сообщения\n- Записи из очередей`)) {
+        return;
+      }
+
+      this.deletingUsers = true;
+
+      try {
+        const response = await axios.delete(`${API_URL}/api/users`, {
+          data: { chatIds: this.selectedUsers }
+        });
+
+        const result = response.data;
+        
+        // Clear selection and reload users
+        this.selectedUsers = [];
+        await this.loadUsers();
+        
+        alert(`Успешно удалено ${result.deletedCount} из ${result.requestedCount} пользователей.${result.notFoundCount > 0 ? `\nНе найдено: ${result.notFoundCount}` : ''}`);
+      } catch (error) {
+        console.error('Error mass deleting users:', error);
+        const errorMessage = error.response?.data?.error || 'Ошибка при массовом удалении пользователей';
+        alert(`Ошибка: ${errorMessage}`);
+      } finally {
+        this.deletingUsers = false;
       }
     },
           applyFilters() {
