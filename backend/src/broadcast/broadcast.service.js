@@ -28,6 +28,25 @@ class BroadcastService {
   }
 
   /**
+   * Get all attention_needed users
+   * @returns {Promise<Array>} Array of attention_needed users
+   */
+  async getAttentionNeededUsers() {
+    try {
+      const users = await this.prisma.user.findMany({
+        where: {
+          is_blocked: false,
+          attention_needed: true
+        }
+      });
+      return users;
+    } catch (error) {
+      console.error('Error getting attention_needed users:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Get post by ID
    * @param {number} postId - Post ID
    * @returns {Promise<Object|null>} Post object or null if not found
@@ -71,7 +90,7 @@ class BroadcastService {
         where: { chat_id: chatId },
         data: { updatedAt: new Date() }
       });
-     
+
 
       return { success: true, chatId };
     } catch (error) {
@@ -107,46 +126,58 @@ class BroadcastService {
   }
 
   async addPostToQueue(postId, userIds) {
-      let addedCount = 0;
-      const errors = [];
+    let addedCount = 0;
+    let skippedCount = 0;
+    const errors = [];
 
-      for (const userId of userIds) {
-        try {
-          // Проверяем существование пользователя
-          const user = await this.prisma.user.findUnique({
-            where: { chat_id: userId.toString() }
-          });
-          const existingQueueItem = await this.prisma.postQueue.findFirst({
-            where: {
-              user_id: user.id,
-              post_id: parseInt(postId)
-            }
-          });
-          if (existingQueueItem) {
-            console.log(`User ${userId} already in post queue for post ${postId}, skipping...`);
-            continue;
-          }
-          await this.prisma.postQueue.create({
-            data: {
-              user_id: user.id,
-              post_id: parseInt(postId)
-            }
-          });
+    for (const userId of userIds) {
+      try {
+        // Проверяем существование пользователя
+        const user = await this.prisma.user.findUnique({
+          where: { chat_id: userId.toString() }
+        });
 
-          addedCount++;
-          console.log(`Successfully added user ${userId} to post queue`);
-
-        } catch (error) {
-          console.error(`Error adding user ${userId} to post queue:`, error);
-          errors.push({ userId, error: error.message });
+        if (!user || !user.id) {
+          console.log(`User with chat_id ${userId} not found or has no ID, skipping...`);
+          skippedCount++;
+          continue;
         }
-      }
 
-      return {
-        success: true,
-        addedCount,
-        errors
-      };
+        const existingQueueItem = await this.prisma.postQueue.findFirst({
+          where: {
+            user_id: user.id,
+            post_id: parseInt(postId)
+          }
+        });
+
+        if (existingQueueItem) {
+          console.log(`User ${userId} already in post queue for post ${postId}, skipping...`);
+          skippedCount++;
+          continue;
+        }
+
+        await this.prisma.postQueue.create({
+          data: {
+            user_id: user.id,
+            post_id: parseInt(postId)
+          }
+        });
+
+        addedCount++;
+        console.log(`Successfully added user ${userId} to post queue`);
+
+      } catch (error) {
+        console.error(`Error adding user ${userId} to post queue:`, error);
+        errors.push({ userId, error: error.message });
+      }
+    }
+
+    return {
+      success: true,
+      addedCount,
+      skippedCount,
+      errors
+    };
   }
 
   /**
