@@ -58,7 +58,7 @@ class BroadcastRouter {
       }
     });
 
-    // Broadcast post to all users
+    // Broadcast post to all users (now adds to PostQueue for cron processing)
     this.router.post('/broadcast/:postId', async (req, res) => {
       try {
         const { postId } = req.params;
@@ -75,45 +75,63 @@ class BroadcastRouter {
         if (users.length === 0) {
           return res.json({
             message: 'No active users to broadcast to',
-            sentCount: 0,
+            addedCount: 0,
             totalUsers: 0
           });
         }
 
-        // Get bot instance
-        const bot = this.botService.getBot();
-        if (!bot) {
-          return res.status(500).json({ error: 'Bot is not initialized' });
-        }
-
-        // Send post to all users using encapsulated method
-        const sendResult = await this.broadcastService.sendPostToUsers(post, users.map(u => u.chat_id), this.buttonsService, bot);
-        const { sentCount, errors, results } = sendResult;
-
-        // After successful post sending to all users, reset attention_needed
-        if (sentCount > 0) {
-          try {
-            const successfulChatIds = results
-              .filter(r => r.success)
-              .map(r => r.chatId);
-
-            await attentionChecker.resetUserAttentionByChatIds(successfulChatIds);
-            console.log(`Reset attention_needed for ${successfulChatIds.length} users after mass broadcast`);
-          } catch (resetError) {
-            console.error('Error resetting attention_needed after mass broadcast:', resetError);
-            // Не блокируем основной ответ из-за ошибки сброса attention_needed
-          }
-        }
+        // Add post to queue for all users
+        const result = await this.broadcastService.addPostToQueue(parseInt(postId), users.map(u => u.chat_id));
 
         res.json({
           success: true,
-          message: `Post sent to ${sentCount} users`,
-          sentCount,
-          errors
+          message: `Post added to queue for ${result.addedCount} users`,
+          addedCount: result.addedCount,
+          totalUsers: users.length,
+          skippedCount: result.skippedCount
         });
 
       } catch (error) {
-        console.error('Error broadcasting post:', error);
+        console.error('Error adding post to queue:', error);
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    // Broadcast post to attention_needed users only (adds to PostQueue for cron processing)
+    this.router.post('/broadcast/:postId/attention', async (req, res) => {
+      try {
+        const { postId } = req.params;
+
+        // Get the post
+        const post = await this.broadcastService.getPostById(parseInt(postId));
+        if (!post) {
+          return res.status(404).json({ error: 'Post not found' });
+        }
+
+        // Get attention_needed users
+        const users = await this.broadcastService.getAttentionNeededUsers();
+
+        if (users.length === 0) {
+          return res.json({
+            message: 'No users need attention',
+            addedCount: 0,
+            totalUsers: 0
+          });
+        }
+
+        // Add post to queue for attention_needed users
+        const result = await this.broadcastService.addPostToQueue(parseInt(postId), users.map(u => u.chat_id));
+
+        res.json({
+          success: true,
+          message: `Post added to queue for ${result.addedCount} attention_needed users`,
+          addedCount: result.addedCount,
+          totalUsers: users.length,
+          skippedCount: result.skippedCount
+        });
+
+      } catch (error) {
+        console.error('Error adding post to attention_needed users queue:', error);
         res.status(500).json({ error: error.message });
       }
     });

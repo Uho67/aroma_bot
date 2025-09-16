@@ -391,6 +391,122 @@ app.post('/api/users/:chatId/check-subscription', async (req, res) => {
   }
 });
 
+// Delete user
+app.delete('/api/users/:chatId', async (req, res) => {
+  try {
+    const { chatId } = req.params;
+
+    // Check if user exists
+    const user = await prisma.user.findUnique({
+      where: { chat_id: chatId }
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Delete user and all related data
+    await prisma.$transaction(async (tx) => {
+      // Delete user sales rules
+      await tx.userSalesRule.deleteMany({
+        where: { user_id: user.id }
+      });
+
+      // Delete coupon codes (using chat_id, not user_id)
+      await tx.couponCode.deleteMany({
+        where: { chat_id: user.chat_id }
+      });
+
+      // Delete from post queue
+      await tx.postQueue.deleteMany({
+        where: { user_id: user.id }
+      });
+
+      // Delete from sales rule queue
+      await tx.userSalesRuleQueue.deleteMany({
+        where: { user_id: user.id }
+      });
+
+      // Finally delete the user
+      await tx.user.delete({
+        where: { id: user.id }
+      });
+    });
+
+    res.json({
+      success: true,
+      message: `User ${chatId} deleted successfully`
+    });
+
+  } catch (error) {
+    console.error('Error deleting user:', error);
+    res.status(500).json({ error: 'Failed to delete user' });
+  }
+});
+
+// Mass delete users
+app.delete('/api/users', async (req, res) => {
+  try {
+    const { chatIds } = req.body;
+
+    if (!chatIds || !Array.isArray(chatIds) || chatIds.length === 0) {
+      return res.status(400).json({ error: 'chatIds array is required' });
+    }
+
+    // Get all users that exist
+    const users = await prisma.user.findMany({
+      where: { chat_id: { in: chatIds } }
+    });
+
+    if (users.length === 0) {
+      return res.status(404).json({ error: 'No users found' });
+    }
+
+    const userIds = users.map(user => user.id);
+    const userChatIds = users.map(user => user.chat_id);
+
+    // Delete all users and their related data
+    await prisma.$transaction(async (tx) => {
+      // Delete user sales rules
+      await tx.userSalesRule.deleteMany({
+        where: { user_id: { in: userIds } }
+      });
+
+      // Delete coupon codes (using chat_id, not user_id)
+      await tx.couponCode.deleteMany({
+        where: { chat_id: { in: userChatIds } }
+      });
+
+      // Delete from post queue
+      await tx.postQueue.deleteMany({
+        where: { user_id: { in: userIds } }
+      });
+
+      // Delete from sales rule queue
+      await tx.userSalesRuleQueue.deleteMany({
+        where: { user_id: { in: userIds } }
+      });
+
+      // Finally delete all users
+      await tx.user.deleteMany({
+        where: { id: { in: userIds } }
+      });
+    });
+
+    res.json({
+      success: true,
+      message: `Successfully deleted ${users.length} users`,
+      deletedCount: users.length,
+      requestedCount: chatIds.length,
+      notFoundCount: chatIds.length - users.length
+    });
+
+  } catch (error) {
+    console.error('Error mass deleting users:', error);
+    res.status(500).json({ error: 'Failed to delete users' });
+  }
+});
+
 app.get('/api/messages', async (req, res) => {
   try {
     const messages = await prisma.message.findMany({

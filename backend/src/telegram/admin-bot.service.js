@@ -35,7 +35,10 @@ class AdminBotService {
 	async setupBotHandlers() {
 		// Handle text messages (coupon code queries)
 		this.bot.on('message', async (msg) => {
-			if (msg.text && !msg.text.startsWith('/')) {
+			// Check if message is forwarded from a channel
+			if (msg.forward_from_chat && msg.forward_from_chat.type === 'channel') {
+				await this.handleForwardedMessage(msg);
+			} else if (msg.text && !msg.text.startsWith('/')) {
 				await this.handleCouponCodeQuery(msg);
 			}
 		});
@@ -44,6 +47,131 @@ class AdminBotService {
 		this.bot.on('callback_query', async (callbackQuery) => {
 			await this.handleCallbackQuery(callbackQuery);
 		});
+	}
+
+	async handleForwardedMessage(msg) {
+		try {
+			const chatId = msg.chat.id;
+			const forwardInfo = msg.forward_from_chat;
+			const forwardDate = msg.forward_date;
+			const forwardSignature = msg.forward_signature;
+			const forwardSenderName = msg.forward_sender_name;
+
+			// Extract comprehensive channel information
+			const channelInfo = {
+				// Channel identification
+				channelId: forwardInfo.id,
+				channelTitle: forwardInfo.title,
+				channelUsername: forwardInfo.username,
+				channelType: forwardInfo.type,
+
+				// Message information
+				messageId: msg.message_id,
+				messageText: msg.text || msg.caption || 'No text content',
+				messageType: msg.photo ? 'photo' : msg.video ? 'video' : msg.document ? 'document' : msg.audio ? 'audio' : msg.voice ? 'voice' : msg.sticker ? 'sticker' : 'text',
+
+				// Forward information
+				forwardDate: forwardDate ? new Date(forwardDate * 1000).toISOString() : null,
+				forwardSignature: forwardSignature,
+				forwardSenderName: forwardSenderName,
+
+				// Media information
+				hasPhoto: !!msg.photo,
+				hasVideo: !!msg.video,
+				hasDocument: !!msg.document,
+				hasAudio: !!msg.audio,
+				hasVoice: !!msg.voice,
+				hasSticker: !!msg.sticker,
+
+				// Media details
+				photoInfo: msg.photo ? {
+					fileId: msg.photo[msg.photo.length - 1].file_id,
+					width: msg.photo[msg.photo.length - 1].width,
+					height: msg.photo[msg.photo.length - 1].height,
+					fileSize: msg.photo[msg.photo.length - 1].file_size
+				} : null,
+				videoInfo: msg.video ? {
+					fileId: msg.video.file_id,
+					width: msg.video.width,
+					height: msg.video.height,
+					duration: msg.video.duration,
+					fileSize: msg.video.file_size
+				} : null,
+				documentInfo: msg.document ? {
+					fileId: msg.document.file_id,
+					fileName: msg.document.file_name,
+					mimeType: msg.document.mime_type,
+					fileSize: msg.document.file_size
+				} : null,
+
+				// Additional metadata
+				receivedAt: new Date().toISOString(),
+				receivedByChatId: chatId,
+				receivedByUserId: msg.from?.id,
+				receivedByUsername: msg.from?.username,
+				receivedByFirstName: msg.from?.first_name,
+				receivedByLastName: msg.from?.last_name
+			};
+
+			// Log all channel and post information
+			console.log('📢 FORWARDED MESSAGE FROM CHANNEL:');
+			console.log('=====================================');
+			console.log(`🆔 Channel ID: ${channelInfo.channelId}`);
+			console.log(`📺 Channel Title: ${channelInfo.channelTitle}`);
+			console.log(`👤 Channel Username: @${channelInfo.channelUsername || 'N/A'}`);
+			console.log(`📝 Message Type: ${channelInfo.messageType}`);
+			console.log(`📄 Message Text: ${channelInfo.messageText}`);
+			console.log(`📅 Forward Date: ${channelInfo.forwardDate || 'N/A'}`);
+			console.log(`✍️ Forward Signature: ${channelInfo.forwardSignature || 'N/A'}`);
+			console.log(`👤 Forward Sender: ${channelInfo.forwardSenderName || 'N/A'}`);
+			console.log(`📱 Media Types: Photo: ${channelInfo.hasPhoto}, Video: ${channelInfo.hasVideo}, Document: ${channelInfo.hasDocument}, Audio: ${channelInfo.hasAudio}, Voice: ${channelInfo.hasVoice}, Sticker: ${channelInfo.hasSticker}`);
+
+			// Log media details if present
+			if (channelInfo.photoInfo) {
+				console.log(`📸 Photo Details: ${channelInfo.photoInfo.width}x${channelInfo.photoInfo.height}, Size: ${channelInfo.photoInfo.fileSize || 'Unknown'} bytes`);
+			}
+			if (channelInfo.videoInfo) {
+				console.log(`🎥 Video Details: ${channelInfo.videoInfo.width}x${channelInfo.videoInfo.height}, Duration: ${channelInfo.videoInfo.duration}s, Size: ${channelInfo.videoInfo.fileSize || 'Unknown'} bytes`);
+			}
+			if (channelInfo.documentInfo) {
+				console.log(`📄 Document Details: ${channelInfo.documentInfo.fileName}, Type: ${channelInfo.documentInfo.mimeType}, Size: ${channelInfo.documentInfo.fileSize || 'Unknown'} bytes`);
+			}
+
+			console.log(`⏰ Received At: ${channelInfo.receivedAt}`);
+			console.log(`💬 Received By Chat ID: ${channelInfo.receivedByChatId}`);
+			console.log(`👤 Received By User: ${channelInfo.receivedByFirstName || ''} ${channelInfo.receivedByLastName || ''} (@${channelInfo.receivedByUsername || 'N/A'}) (ID: ${channelInfo.receivedByUserId})`);
+			console.log('=====================================');
+
+			// Send confirmation message to admin
+			let confirmationMessage = `📢 **Forwarded Message Detected**\n\n` +
+				`🆔 **Channel ID:** \`${channelInfo.channelId}\`\n` +
+				`📺 **Channel:** ${channelInfo.channelTitle}\n` +
+				`👤 **Username:** @${channelInfo.channelUsername || 'N/A'}\n` +
+				`📝 **Message Type:** ${channelInfo.messageType}\n` +
+				`📄 **Content:** ${channelInfo.messageText.substring(0, 100)}${channelInfo.messageText.length > 100 ? '...' : ''}\n` +
+				`📅 **Forward Date:** ${channelInfo.forwardDate || 'N/A'}\n` +
+				`⏰ **Received:** ${new Date().toLocaleString('ru-RU')}`;
+
+			// Add media details to confirmation message
+			if (channelInfo.photoInfo) {
+				confirmationMessage += `\n📸 **Photo:** ${channelInfo.photoInfo.width}x${channelInfo.photoInfo.height}`;
+			}
+			if (channelInfo.videoInfo) {
+				confirmationMessage += `\n🎥 **Video:** ${channelInfo.videoInfo.width}x${channelInfo.videoInfo.height}, ${channelInfo.videoInfo.duration}s`;
+			}
+			if (channelInfo.documentInfo) {
+				confirmationMessage += `\n📄 **Document:** ${channelInfo.documentInfo.fileName}`;
+			}
+
+			await this.bot.sendMessage(chatId, confirmationMessage, {
+				parse_mode: 'Markdown'
+			});
+
+		} catch (error) {
+			console.error('Error handling forwarded message:', error);
+			// Send error notification to admin
+			await this.bot.sendMessage(msg.chat.id, '❌ Error processing forwarded message. Check logs for details.');
+		}
 	}
 
 	async handleCouponCodeQuery(msg) {
