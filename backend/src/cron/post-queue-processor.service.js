@@ -22,9 +22,9 @@ class PostQueueProcessorService {
     console.log('🚀 Starting post queue processing...');
 
     try {
-      // Получаем 100 записей из очереди постов (без include)
+      // Получаем 300 записей из очереди постов (без include)
       const queueItems = await prisma.postQueue.findMany({
-        take: 100,
+        take: 300,
         orderBy: { createdAt: 'asc' }
       });
 

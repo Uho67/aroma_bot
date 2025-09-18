@@ -21,7 +21,7 @@ const startAttentionCheckCron = () => {
 
 // Запускаем обработку очереди купонов каждые 5 минут
 const startQueueProcessorCron = () => {
-  cron.schedule('*/5 * * * *', async () => {
+  cron.schedule('*/2 * * * *', async () => {
     console.log('Running queue processor...');
     await queueProcessor.processQueue();
   }, {
@@ -31,16 +31,16 @@ const startQueueProcessorCron = () => {
   console.log('Queue processor cron job scheduled for every 5 minutes');
 };
 
-// Запускаем обработку очереди постов каждые 5 минут
+// Запускаем обработку очереди постов каждые 2 минуты
 const startPostQueueProcessorCron = () => {
-  cron.schedule('*/5 * * * *', async () => {
+  cron.schedule('*/2 * * * *', async () => {
     console.log('Running post queue processor...');
     await postQueueProcessor.processPostQueue();
   }, {
     scheduled: true,
     timezone: 'Europe/Moscow'
   });
-  console.log('Post queue processor cron job scheduled for every 5 minutes');
+  console.log('Post queue processor cron job scheduled for every 2 minutes');
 };
 
 // Запускаем все cron jobs
