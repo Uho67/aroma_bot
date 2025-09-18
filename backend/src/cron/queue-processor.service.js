@@ -21,7 +21,7 @@ class QueueProcessorService {
     try {
       // Получаем 100 записей из очереди
       const queueItems = await prisma.userSalesRuleQueue.findMany({
-        take: 100,
+        take: 300,
         orderBy: { createdAt: 'asc' } // Обрабатываем по порядку (FIFO)
       });
 
