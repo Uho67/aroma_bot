@@ -77,6 +77,28 @@ class BotService {
       const chatId = callbackQuery.message.chat.id;
       const data = callbackQuery.data;
 
+      // Check if user exists, if not - add them (for button clicks)
+      try {
+        const existingUser = await this.userService.getUserByChatId(chatId.toString());
+
+        if (!existingUser) {
+          // Create new user for any button interaction
+          const userData = {
+            chat_id: chatId.toString(),
+            user_name: callbackQuery.from.username || null,
+            first_name: callbackQuery.from.first_name || null,
+            last_name: callbackQuery.from.last_name || null,
+            is_blocked: false
+          };
+
+          await this.userService.createUser(userData);
+          console.log(`New user registered via callback: ${userData.first_name} (${chatId})`);
+        }
+      } catch (error) {
+        console.error('Error handling user in callback:', error);
+        // Continue with bot functionality even if user storage fails
+      }
+
       if (data === 'welcome' || data === 'start') {
         this.sendStartMessage(this.bot, chatId);
       }
@@ -180,15 +202,6 @@ class BotService {
 
           await this.userService.createUser(userData);
           console.log(`New user registered via message: ${userData.first_name} (${chatId})`);
-        } else {
-          // Update existing user information (in case name changed)
-          const userData = {
-            user_name: msg.from.username || existingUser.user_name,
-            first_name: msg.from.first_name || existingUser.first_name,
-            last_name: msg.from.last_name || existingUser.last_name
-          };
-
-          await this.userService.updateUser(chatId.toString(), userData);
         }
       } catch (error) {
         console.error('Error handling user in message:', error);
