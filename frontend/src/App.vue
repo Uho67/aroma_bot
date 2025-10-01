@@ -1,12 +1,17 @@
 <template>
   <div class="app">
-    <!-- Modern Navigation -->
-    <nav class="navbar navbar-expand-lg shadow-sm sticky-top">
-      <div class="container-fluid px-4">
-        <a class="navbar-brand d-flex align-items-center" href="#">
-          <i class="fab fa-telegram-plane text-primary me-2 fs-4"></i>
-          <span class="fw-bold text-dark">Bot Dashboard</span>
-        </a>
+    <!-- Login Form -->
+    <LoginForm v-if="!isAuthenticated" @login-success="handleLoginSuccess" />
+    
+    <!-- Main Dashboard (Authenticated) -->
+    <div v-else>
+      <!-- Modern Navigation -->
+      <nav class="navbar navbar-expand-lg shadow-sm sticky-top">
+        <div class="container-fluid px-4">
+          <a class="navbar-brand d-flex align-items-center" href="#">
+            <i class="fab fa-telegram-plane text-primary me-2 fs-4"></i>
+            <span class="fw-bold text-dark">Bot Dashboard</span>
+          </a>
         
         <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
           <span class="navbar-toggler-icon"></span>
@@ -78,6 +83,21 @@
               </a>
             </li>
           </ul>
+          
+          <!-- User Menu -->
+          <div class="navbar-nav ms-auto">
+            <div class="nav-item dropdown">
+              <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" role="button" data-bs-toggle="dropdown">
+                <i class="fas fa-user-circle me-2"></i>
+                {{ currentUser?.user_name || 'Admin' }}
+              </a>
+              <ul class="dropdown-menu dropdown-menu-end">
+                <li><a class="dropdown-item" href="#" @click.prevent="handleLogout">
+                  <i class="fas fa-sign-out-alt me-2"></i>Logout
+                </a></li>
+              </ul>
+            </div>
+          </div>
         </div>
       </div>
     </nav>
@@ -102,6 +122,7 @@
         </div>
       </div>
     </div>
+    </div>
   </div>
 </template>
 
@@ -115,6 +136,8 @@ import SalesRuleManager from './components/SalesRuleManager.vue';
 import CouponCodeManager from './components/CouponCodeManager.vue';
 import CronManager from './components/CronManager.vue';
 import ConfigurationManager from './components/ConfigurationManager.vue';
+import LoginForm from './components/LoginForm.vue';
+import authService from './services/authService.js';
 
 export default {
   name: 'App',
@@ -127,16 +150,44 @@ export default {
     SalesRuleManager,
     CouponCodeManager,
     CronManager,
-    ConfigurationManager
+    ConfigurationManager,
+    LoginForm
   },
   data() {
     return {
       currentView: 'posts'
     };
   },
+  computed: {
+    isAuthenticated() {
+      return authService.isAuthenticated();
+    },
+    currentUser() {
+      return authService.getCurrentUser();
+    }
+  },
   methods: {
     setView(view) {
       this.currentView = view;
+    },
+    handleLoginSuccess(admin) {
+      console.log('Login successful:', admin);
+      // The authentication state will automatically update due to reactive computed properties
+    },
+    async handleLogout() {
+      try {
+        await authService.logout();
+        // Reset to default view
+        this.currentView = 'posts';
+      } catch (error) {
+        console.error('Logout error:', error);
+      }
+    }
+  },
+  mounted() {
+    // Check if user is already authenticated on app load
+    if (authService.isAuthenticated()) {
+      console.log('User is already authenticated:', authService.getCurrentUser());
     }
   }
 };
