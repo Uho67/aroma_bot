@@ -7,40 +7,40 @@ const attentionChecker = new AttentionCheckerService();
 const queueProcessor = new QueueProcessorService();
 const postQueueProcessor = new PostQueueProcessorService();
 
-// Запускаем проверку каждый день в 9:00 утра (DISABLED: Feb 29 schedule)
+// Запускаем проверку каждый день в 9:00 утра
 const startAttentionCheckCron = () => {
-  cron.schedule('0 9 29 2 *', async () => {
+  cron.schedule('0 9 * * *', async () => {
     console.log('Running daily attention check...');
     await attentionChecker.checkUsersAttention();
   }, {
     scheduled: true,
     timezone: 'Europe/Moscow'
   });
-  console.log('Attention check cron job DISABLED (Feb 29 schedule)');
+  console.log('Attention check cron job scheduled for daily at 9:00 AM');
 };
 
-// Запускаем обработку очереди купонов каждые 5 минут (DISABLED: Feb 29 schedule)
+// Запускаем обработку очереди купонов каждые 5 минут
 const startQueueProcessorCron = () => {
-  cron.schedule('0 0 29 2 *', async () => {
+  cron.schedule('*/5 * * * *', async () => {
     console.log('Running queue processor...');
     await queueProcessor.processQueue();
   }, {
     scheduled: true,
     timezone: 'Europe/Moscow'
   });
-  console.log('Queue processor cron job DISABLED (Feb 29 schedule)');
+  console.log('Queue processor cron job scheduled for every 5 minutes');
 };
 
-// Запускаем обработку очереди постов каждые 2 минуты (DISABLED: Feb 29 schedule)
+// Запускаем обработку очереди постов каждые 5 минут
 const startPostQueueProcessorCron = () => {
-  cron.schedule('0 0 29 2 *', async () => {
+  cron.schedule('*/5 * * * *', async () => {
     console.log('Running post queue processor...');
     await postQueueProcessor.processPostQueue();
   }, {
     scheduled: true,
     timezone: 'Europe/Moscow'
   });
-  console.log('Post queue processor cron job DISABLED (Feb 29 schedule)');
+  console.log('Post queue processor cron job scheduled for every 5 minutes');
 };
 
 // Запускаем все cron jobs
