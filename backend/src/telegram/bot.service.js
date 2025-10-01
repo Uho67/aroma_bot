@@ -77,6 +77,28 @@ class BotService {
       const chatId = callbackQuery.message.chat.id;
       const data = callbackQuery.data;
 
+      // Check if user exists, if not - add them (for button clicks)
+      try {
+        const existingUser = await this.userService.getUserByChatId(chatId.toString());
+
+        if (!existingUser) {
+          // Create new user for any button interaction
+          const userData = {
+            chat_id: chatId.toString(),
+            user_name: callbackQuery.from.username || null,
+            first_name: callbackQuery.from.first_name || null,
+            last_name: callbackQuery.from.last_name || null,
+            is_blocked: false
+          };
+
+          await this.userService.createUser(userData);
+          console.log(`New user registered via callback: ${userData.first_name} (${chatId})`);
+        }
+      } catch (error) {
+        console.error('Error handling user in callback:', error);
+        // Continue with bot functionality even if user storage fails
+      }
+
       if (data === 'welcome' || data === 'start') {
         this.sendStartMessage(this.bot, chatId);
       }
@@ -158,6 +180,33 @@ class BotService {
     // Handle general messages
     this.bot.on('message', async (msg) => {
       const chatId = msg.chat.id;
+
+      // Skip if it's a /start command (already handled above)
+      if (msg.text && msg.text.startsWith('/start')) {
+        return;
+      }
+
+      try {
+        // Check if user exists, if not - add them
+        const existingUser = await this.userService.getUserByChatId(chatId.toString());
+
+        if (!existingUser) {
+          // Create new user for any message interaction
+          const userData = {
+            chat_id: chatId.toString(),
+            user_name: msg.from.username || null,
+            first_name: msg.from.first_name || null,
+            last_name: msg.from.last_name || null,
+            is_blocked: false
+          };
+
+          await this.userService.createUser(userData);
+          console.log(`New user registered via message: ${userData.first_name} (${chatId})`);
+        }
+      } catch (error) {
+        console.error('Error handling user in message:', error);
+        // Continue with bot functionality even if user storage fails
+      }
 
       // Get keyboard layout using ButtonsService
       const keyboard = await this.buttonsService.getWelcomeMenuButtons();
