@@ -2,10 +2,12 @@ const cron = require('node-cron');
 const AttentionCheckerService = require('./attention-checker.service');
 const QueueProcessorService = require('./queue-processor.service');
 const PostQueueProcessorService = require('./post-queue-processor.service');
+const BackupService = require('./backup.service');
 
 const attentionChecker = new AttentionCheckerService();
 const queueProcessor = new QueueProcessorService();
 const postQueueProcessor = new PostQueueProcessorService();
+const backupService = new BackupService();
 
 // Запускаем проверку каждый день в 9:00 утра
 const startAttentionCheckCron = () => {
@@ -43,11 +45,24 @@ const startPostQueueProcessorCron = () => {
   console.log('Post queue processor cron job scheduled for every 5 minutes');
 };
 
+// Запускаем создание бэкапа базы данных каждый день в 6:00 утра
+const startBackupCron = () => {
+  cron.schedule('0 6 * * *', async () => {
+    console.log('Running daily database backup...');
+    await backupService.runBackupProcess();
+  }, {
+    scheduled: true,
+    timezone: 'Europe/Moscow'
+  });
+  console.log('Database backup cron job scheduled for daily at 6:00 AM');
+};
+
 // Запускаем все cron jobs
 const startAllCrons = () => {
   startAttentionCheckCron();
   startQueueProcessorCron();
   startPostQueueProcessorCron();
+  startBackupCron();
 };
 
 module.exports = {
@@ -55,8 +70,10 @@ module.exports = {
   attentionChecker,
   queueProcessor,
   postQueueProcessor,
+  backupService,
   // Экспортируем отдельные функции
   startAttentionCheckCron,
   startQueueProcessorCron,
-  startPostQueueProcessorCron
+  startPostQueueProcessorCron,
+  startBackupCron
 };

@@ -99,10 +99,6 @@ class BotService {
         // Continue with bot functionality even if user storage fails
       }
 
-      if (data === 'welcome' || data === 'start') {
-        this.sendStartMessage(this.bot, chatId);
-      }
-
       if (data === 'catalog') {
         try {
           // Answer the callback query to remove the loading state
@@ -116,6 +112,7 @@ class BotService {
           console.error('Error sending catalog:', error);
           this.bot.sendMessage(chatId, 'Произошла ошибка при загрузке каталога.');
         }
+        return;
       }
 
       if (data.includes('_menu')) {
@@ -138,6 +135,7 @@ class BotService {
             reply_markup: await this.buttonsService.getCatalogMenuButtons()
           });
         }
+        return;
       } else if (data.startsWith('message_')) {
         // Handle message buttons - extract message text from button value
         const messageText = data.replace('message_', '');
@@ -147,7 +145,9 @@ class BotService {
         } else {
           await this.bot.sendMessage(chatId, 'Сообщение не найдено.');
         }
+        return;
       }
+      this.sendStartMessage(this.bot, chatId);
     });
 
     // Handle user blocking/unblocking the bot
